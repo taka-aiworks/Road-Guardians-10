@@ -9,7 +9,7 @@
   html,body{margin:0;background:var(--bg);color:#eef;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
   #hud{display:flex;gap:8px;align-items:center;justify-content:center;padding:8px;background:var(--panel);position:sticky;top:0;z-index:2;flex-wrap:wrap}
   .pill{padding:6px 10px;border-radius:999px;background:#1e2532;font-weight:600}
-  .btn{padding:10px 14px;border:1px solid #2a3446;border-radius:10px;background:#1a2130;color:#eef;font-weight:700}
+  .btn{padding:10px 14px;border:1px solid #2a3446;border-radius:10px;background:#1a2130;color:#eef;font-weight:700;touch-action:manipulation}
   .btn:active{transform:translateY(1px)}
   .btn.ok{border-color:#1b6e3c;background:#12492b}
   .btn.warn{border-color:#7a560c;background:#2a220c}
@@ -88,10 +88,12 @@
   let toastTimer=null;
   function toast(s){ clearTimeout(toastTimer); toastEl.textContent=s; toastEl.style.opacity=1; toastTimer=setTimeout(()=>toastEl.style.opacity=0,1300); }
 
-  // ========= WebAudio：SE & BGM =========
+  // ========= WebAudio：SE & BGM（段階的に勇ましく） =========
   const AudioSys = {
     ctx:null, master:null, sfx:null, bgm:null,
-    on:false, bgmOn:false, bpm:92, tickMS:0, timer:null, step:0
+    on:false, bgmOn:false, bpm:88, tickMS:0, timer:null, step:0,
+    theme:"calm", // "calm" -> "adventure" -> "heroic"
+    density:1 // 音数の多さ（1..3）
   };
   function ensureCtx(){
     if (AudioSys.ctx) return;
@@ -167,45 +169,76 @@
     gameover(){ oscBurst({freq:300,dur:0.3,type:"sine",gain:0.25,glide:0.4}); }
   };
 
-  // ---- BGM（軽量シンセ：アルペジオ＋ノイズハイハット）
+  // ---- BGM：テーマ切替（のどか→冒険→勇ましい）
+  function themeForStage(stageIdx){
+    if (stageIdx<=3) return {name:"calm", bpm:86, density:1};
+    if (stageIdx<=6) return {name:"adventure", bpm:98, density:2};
+    return {name:"heroic", bpm:112, density:3};
+  }
   function startBGM(){
     stopBGM();
     if (!AudioSys.on) return;
     ensureCtx(); resumeCtx();
-    const bpm = AudioSys.bpm;
-    AudioSys.tickMS = (60000/bpm)/4; // 16分音符
+
+    AudioSys.tickMS = (60000/AudioSys.bpm)/4; // 16分音符
     AudioSys.step = 0;
+
     AudioSys.timer = setInterval(()=>{
       if (!AudioSys.bgmOn || !AudioSys.on) return;
       const step = AudioSys.step % 16;
-      const chordIdx = Math.floor(AudioSys.step/16)%4;
-      const chords = [
-        [220.00,261.63,329.63], // Am
-        [174.61,220.00,261.63], // F
-        [196.00,246.94,293.66], // G
-        [164.81,196.00,246.94]  // Em (風味)
-      ];
-      const ch = chords[chordIdx];
+      const bar  = Math.floor(AudioSys.step/16) % 8;
 
-      // kick-ish every 8
-      if (step%8===0) noiseBurst({dur:0.08,lp:400,gain:0.16,out:"bgm"});
-      // hat every 2
-      if (step%2===0) noiseBurst({dur:0.04,lp:6000,gain:0.08,out:"bgm"});
+      // コード進行：テーマで変える
+      let chords;
+      if (AudioSys.theme==="calm"){
+        chords = [ // 優しめ（C-Am-F-G）
+          [261.63,329.63,392.00], // C
+          [220.00,261.63,329.63], // Am
+          [174.61,220.00,261.63], // F
+          [196.00,246.94,293.66]  // G
+        ];
+      } else if (AudioSys.theme==="adventure"){
+        chords = [ // 前進感（Dm-Bb-F-C）
+          [293.66,349.23,440.00], // Dm
+          [233.08,277.18,349.23], // Bb
+          [174.61,220.00,261.63], // F
+          [261.63,329.63,392.00]  // C
+        ];
+      } else {
+        chords = [ // 勇ましい（Em-C-G-D）
+          [329.63,392.00,493.88], // Em
+          [261.63,329.63,392.00], // C
+          [196.00,246.94,392.00], // G(5th up)
+          [293.66,369.99,440.00]  // D
+        ];
+      }
+      const ch = chords[bar%chords.length];
 
-      // bass on 0 & 8
-      if (step===0 || step===8) oscBurst({freq:ch[0]/2,dur:0.18,type:"sawtooth",gain:0.12,glide:0.9,out:"bgm"});
+      // リズム密度
+      const d = AudioSys.density; // 1..3
 
-      // chord pluck every 4 steps
-      if (step%4===0){
-        oscBurst({freq:ch[0],dur:0.16,type:"triangle",gain:0.09,out:"bgm"});
-        oscBurst({freq:ch[1],dur:0.16,type:"triangle",gain:0.08,out:"bgm"});
-        oscBurst({freq:ch[2],dur:0.16,type:"triangle",gain:0.08,out:"bgm"});
+      // Kick-ish
+      if (step%8===0) noiseBurst({dur:0.08,lp:400,gain:0.13+0.03*d,out:"bgm"});
+      // Hat
+      if (step%2===0) noiseBurst({dur:0.04,lp:6000,gain:0.06+0.02*d,out:"bgm"});
+
+      // Bass（裏拍も追加：密度が上がるほど音が増える）
+      if (step===0 || (d>=2 && step===8) || (d>=3 && step===12)) {
+        oscBurst({freq:ch[0]/2,dur:0.16+0.02*d,type:"sawtooth",gain:0.10+0.02*d,glide:0.9,out:"bgm"});
       }
 
-      // arpeggio lead on odd steps
-      if (step%2===1){
-        const note = ch[(step%3)];
-        oscBurst({freq:note*2,dur:0.1,type:"sine",gain:0.07,out:"bgm"});
+      // Chord Pluck（密度に応じて頻度UP）
+      if (step%4===0 || (d>=2 && step%4===2)) {
+        oscBurst({freq:ch[0],dur:0.14,type:"triangle",gain:0.08+0.01*d,out:"bgm"});
+        oscBurst({freq:ch[1],dur:0.14,type:"triangle",gain:0.07+0.01*d,out:"bgm"});
+        oscBurst({freq:ch[2],dur:0.14,type:"triangle",gain:0.07+0.01*d,out:"bgm"});
+      }
+
+      // Lead（密度が上がるほど音数増）
+      if ((d>=1 && step%2===1) || (d>=3 && step%1===0 && step%2===0)){
+        const seq = [0,1,2,1]; // シンプルアルペジオ
+        const note = ch[seq[step%seq.length]];
+        oscBurst({freq:note*2,dur:0.10,type:"sine",gain:0.06+0.01*d,out:"bgm"});
       }
 
       AudioSys.step++;
@@ -214,9 +247,14 @@
   function stopBGM(){
     if (AudioSys.timer){ clearInterval(AudioSys.timer); AudioSys.timer=null; }
   }
-  function setBGMTension(level){ // 0..(wave)
-    AudioSys.bpm = 90 + Math.min(40, level*4);
-    if (AudioSys.bgmOn && AudioSys.on){ startBGM(); }
+  function applyTheme(stageIdx, waveIdx){
+    const t = themeForStage(stageIdx);
+    AudioSys.theme = t.name;
+    // ステージとウェーブでBPM/密度を上げる
+    const waveBoost = Math.min(12, Math.floor((waveIdx||0)/2)*2);
+    AudioSys.bpm = t.bpm + waveBoost;
+    AudioSys.density = t.density + (waveIdx>6?1:0);
+    if (AudioSys.bgmOn && AudioSys.on){ startBGM(); } // 反映のため再始動
   }
 
   // ========= ゲーム定数 =========
@@ -318,7 +356,7 @@
   };
 
   // ========= 保存 =========
-  const SAVE_KEY="RG10_SAVE_V1";
+  const SAVE_KEY="RG10_SAVE_V2";
   function saveProgress() {
     localStorage.setItem(SAVE_KEY, JSON.stringify({ stageIdx: G.stageIdx, unlocked: G.stageIdx+1 }));
   }
@@ -359,8 +397,8 @@
     fit();
     updateHUD();
     toast(`Stage ${i+1}: ${s.name}`);
-    // BGMテンションを初期化
-    setBGMTension(0);
+    // BGMテーマ反映（のどか→冒険→勇ましい）
+    applyTheme(G.stageIdx, G.waveIdx);
   }
 
   // ========= ウェーブ制御 =========
@@ -375,7 +413,8 @@
     spawnQueue.length=0;
     for (const pk of packs){ for(let i=0;i<pk.n;i++) spawnQueue.push(pk.type); }
     SFX.start();
-    setBGMTension(G.waveIdx+1);
+    // ウェーブでテンション上げる
+    applyTheme(G.stageIdx, G.waveIdx);
   }
   function waveDone() {
     G.running=false; G.waveIdx++;
@@ -530,8 +569,9 @@
           if (b.aoe>0){
             for (const e2 of G.enemies){
               if (e2.dead) continue;
-              const d2b=(e2.x-b.x)*(e2.x-b.x)+(e2.y-b.y)*(e2.y-b.y);
-              if (d2b<=b.aoe*b.aoe && (!e2.fly || (e2.fly && TowerSpec.ice.fly))){
+              const d2b=(e2.x-b.x)*(e2.x-b.x)+(e2.y-b.y)*(e2.x-b.x)+(e2.y-b.y); // (typo fix not needed visually)
+              const dd = (e2.x-b.x)*(e2.x-b.x)+(e2.y-b.y)*(e2.y-b.y);
+              if (dd<=b.aoe*b.aoe && (!e2.fly || (e2.fly && TowerSpec.ice.fly))){
                 applyHit(e2, b);
               }
             }
@@ -627,7 +667,7 @@
     ctx.restore();
   }
 
-  // ========= 入力 =========
+  // ========= 入力（Pointerで統一） =========
   let hoverCell={cx:-1,cy:-1};
   function getCellFromEvent(ev){
     const r=cv.getBoundingClientRect();
@@ -637,8 +677,19 @@
     const gy = Math.floor(y / (cv.clientHeight/ROWS));
     return {cx:gx, cy:gy};
   }
-  cv.addEventListener("mousemove", e=>{ hoverCell=getCellFromEvent(e); });
-  cv.addEventListener("touchmove", e=>{ hoverCell=getCellFromEvent(e); }, {passive:true});
+  cv.addEventListener('pointermove', e=>{ hoverCell=getCellFromEvent(e); });
+  function onCanvasTap(ev){
+    const {cx,cy}=getCellFromEvent(ev);
+    if (cx<0||cy<0||cx>=COLS||cy>=ROWS) return;
+    if (G.building){
+      if (addTower(G.building.type, cx, cy)){
+        G.building=null; clearSelShop();
+      }
+    } else {
+      selectTowerAt(cx,cy);
+    }
+  }
+  cv.addEventListener('pointerdown', (e)=>{ onCanvasTap(e); });
 
   function selectTowerAt(cx,cy){
     G.sel = G.towers.find(t=>t.cx===cx && t.cy===cy) || null;
@@ -650,41 +701,31 @@
     }
   }
 
-  function onTap(ev){
-    const {cx,cy}=getCellFromEvent(ev);
-    if (cx<0||cy<0||cx>=COLS||cy>=ROWS) return;
-    if (G.building){
-      if (addTower(G.building.type, cx, cy)){
-        G.building=null; clearSelShop();
-      }
-    } else {
-      selectTowerAt(cx,cy);
-    }
+  // ========= ボタン（pointerdownで反応） =========
+  function bindPointer(el, fn){
+    el.addEventListener('pointerdown', e=>{ e.preventDefault(); fn(); });
   }
-  cv.addEventListener("click", onTap);
-  cv.addEventListener("touchend", e=>{ onTap(e); e.preventDefault(); });
-
-  // ========= ボタン類 =========
-  btnStart.onclick = ()=>{ startWave(); SFX.ui(); };
-  btnPause.onclick = ()=> { G.paused=!G.paused; btnPause.textContent = G.paused?"▶":"⏸"; SFX.ui(); };
-  btnSpeed.onclick = ()=> { G.speed = (G.speed===1?2:1); btnSpeed.textContent = `⏩ ×${G.speed}`; SFX.ui(); };
-  btnUp.onclick = ()=> upgradeSel();
-  btnSell.onclick = ()=> sellSel();
-  btnNextStage.onclick = ()=>{
-    if (G.waveIdx<G.waveMax) { toast("まだクリアしていません"); return; }
+  bindPointer(btnStart, ()=>{ startWave(); SFX.ui(); toast('Wave開始'); });
+  bindPointer(btnPause, ()=>{ G.paused=!G.paused; btnPause.textContent = G.paused?'▶':'⏸'; SFX.ui(); toast(G.paused?'一時停止':'再開'); });
+  bindPointer(btnSpeed, ()=>{ G.speed = (G.speed===1?2:1); btnSpeed.textContent = `⏩ ×${G.speed}`; SFX.ui(); toast(`速度×${G.speed}`); });
+  bindPointer(btnUp, ()=> upgradeSel());
+  bindPointer(btnSell, ()=> sellSel());
+  bindPointer(btnNextStage, ()=>{
+    if (G.waveIdx<G.waveMax) { toast('まだクリアしていません'); return; }
     if (G.stageIdx<Stages.length-1) startStage(G.stageIdx+1);
-    else { toast("全ステージクリア！"); }
+    else toast('全ステージクリア！');
+    applyTheme(G.stageIdx, G.waveIdx);
     SFX.ui();
-  };
-  for (const b of document.querySelectorAll(".placeBtn")){
-    b.addEventListener("click", ()=>{
+  });
+  document.querySelectorAll(".placeBtn").forEach(b=>{
+    bindPointer(b, ()=>{
       const t=b.getAttribute("data-t");
       G.building={type:t};
       highlightSelShop(t);
       toast(`${TowerSpec[t].name} を配置：マスをタップ`);
       SFX.ui();
     });
-  }
+  });
   function highlightSelShop(t){
     document.querySelectorAll("#shop .card").forEach(c=>{
       if (c.getAttribute("data-tower")===t) c.classList.add("sel"); else c.classList.remove("sel");
@@ -692,15 +733,25 @@
   }
   function clearSelShop(){ document.querySelectorAll("#shop .card").forEach(c=>c.classList.remove("sel")); }
 
-  // 音ボタン
-  btnAudio.onclick = ()=>{
+  // ========= Audio初期化（最初のタップで） & ボタン =========
+  ['pointerdown','touchstart'].forEach(ev=>{
+    window.addEventListener(ev, ()=>{
+      try {
+        if (!AudioSys.ctx) ensureCtx();
+        resumeCtx();
+      } catch(e){}
+    }, { once:true, passive:true });
+  });
+  bindPointer(btnAudio, ()=>{
     setAudioOn(!AudioSys.on);
-    if (AudioSys.on && !AudioSys.bgmOn){ /* do nothing */ }
-  };
-  btnBGM.onclick = ()=>{
+    toast(AudioSys.on?'音：ON':'音：OFF');
+  });
+  bindPointer(btnBGM, ()=>{
     if (!AudioSys.on) setAudioOn(true);
     setBGMOn(!AudioSys.bgmOn);
-  };
+    toast(AudioSys.bgmOn?'BGM：ON':'BGM：OFF');
+  });
+  updateAudioButtons();
 
   // ========= HUD更新 =========
   function updateHUD(){
@@ -725,7 +776,6 @@
   window.addEventListener("resize", fit);
   fit();
 
-  // 進捗があればそこから
   const prog = loadProgress();
   const startIdx = prog ? Math.min(Stages.length-1, prog.stageIdx) : 0;
   startStage(startIdx);

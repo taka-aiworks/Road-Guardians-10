@@ -5,25 +5,27 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
 <title>Road Guardians 10</title>
 <style>
-  :root { --bg:#0e1116; --panel:#151a23; --accent:#4cc9f0; --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444; }
+  :root { --bg:#0f1320; --panel:#151b28; --accent:#4cc9f0; --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444; }
   html,body{margin:0;background:var(--bg);color:#eef;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
   #hud{display:flex;gap:8px;align-items:center;justify-content:center;padding:8px;background:var(--panel);position:sticky;top:0;z-index:2;flex-wrap:wrap}
-  .pill{padding:6px 10px;border-radius:999px;background:#1e2532;font-weight:600}
-  .btn{padding:10px 14px;border:1px solid #2a3446;border-radius:10px;background:#1a2130;color:#eef;font-weight:700;touch-action:manipulation}
+  .pill{padding:6px 10px;border-radius:999px;background:#1e2538;font-weight:600}
+  .btn{padding:10px 14px;border:1px solid #2a3446;border-radius:10px;background:#1a2333;color:#eef;font-weight:700;touch-action:manipulation}
   .btn:active{transform:translateY(1px)}
   .btn.ok{border-color:#1b6e3c;background:#12492b}
   .btn.warn{border-color:#7a560c;background:#2a220c}
   .btn.bad{border-color:#7a1f1f;background:#2a0f13}
   #wrap{display:flex;flex-direction:column;gap:8px;align-items:center}
-  canvas{background:#0b0f15;border:1px solid #20293a;border-radius:10px;touch-action:none}
+  canvas{background:#0f1724;border:1px solid #203046;border-radius:10px;touch-action:none}
   #shop{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:8px;width:min(720px,96vw)}
-  .card{background:var(--panel);border:1px solid #243041;border-radius:12px;padding:10px}
+  .card{background:#172033;border:1px solid #24344b;border-radius:12px;padding:10px}
   .card h4{margin:.2rem 0 .4rem 0}
   .row{display:flex;gap:8px;align-items:center;justify-content:space-between}
-  .small{opacity:.8;font-size:.9rem}
+  .small{opacity:.85;font-size:.9rem}
   #bottom{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:8px;width:min(720px,96vw)}
   #toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#1b2433;border:1px solid #2b3a52;color:#fff;padding:10px 14px;border-radius:10px;opacity:0;transition:.3s;pointer-events:none;z-index:3}
   .sel{outline:2px solid var(--accent)}
+  /* 簡易エラーオーバーレイ */
+  #err{display:none;position:fixed;left:8px;right:8px;bottom:8px;background:#1b2433;color:#fff;border:1px solid #2b3a52;padding:10px;border-radius:10px;z-index:99999;font-family:ui-monospace,monospace;white-space:pre-wrap;max-height:45vh;overflow:auto}
 </style>
 </head>
 <body>
@@ -40,9 +42,8 @@
   </div>
 
   <div id="wrap">
-    <canvas id="cv" width="960" height="576"></canvas>
+    <canvas id="cv" width="960" height="576" aria-label="game canvas"></canvas>
 
-    <!-- タワーショップ -->
     <div id="shop">
       <div class="card" data-tower="archer">
         <h4>アーチャー</h4>
@@ -61,7 +62,6 @@
       </div>
     </div>
 
-    <!-- 選択タワー操作 -->
     <div id="bottom">
       <button id="btnUpgrade" class="btn warn">⬆ 強化（💵<span id="upCost">-</span>）</button>
       <button id="btnSell" class="btn bad">🗑 売却（💰<span id="sellAmt">-</span>）</button>
@@ -70,13 +70,23 @@
   </div>
 
   <div id="toast"></div>
+  <div id="err"></div>
 
 <script>
 (() => {
-  // ========= 基本ユーティリティ =========
+  // ---------- 安全ネット（エラーを画面表示） ----------
+  const errBox = document.getElementById('err');
+  window.addEventListener('error', (e)=>{
+    errBox.style.display='block';
+    errBox.textContent = 'JS Error: ' + (e.message || e.error);
+  });
+
+  // ---------- 基本ユーティリティ ----------
   const $ = sel => document.querySelector(sel);
   const cv = $("#cv"), ctx = cv.getContext("2d");
   const DPR = Math.max(1, Math.min(2, window.devicePixelRatio||1));
+  const toastEl=$("#toast"); let toastTimer=null;
+  function toast(s){ clearTimeout(toastTimer); toastEl.textContent=s; toastEl.style.opacity=1; toastTimer=setTimeout(()=>toastEl.style.opacity=0,1400); }
   function fit() {
     const w = Math.min(960, innerWidth*0.96);
     const h = w*0.6;
@@ -84,75 +94,43 @@
     cv.width = (w*DPR)|0; cv.height = (h*DPR)|0;
     TILE = Math.floor(cv.width / COLS);
   }
-  const toastEl=$("#toast");
-  let toastTimer=null;
-  function toast(s){ clearTimeout(toastTimer); toastEl.textContent=s; toastEl.style.opacity=1; toastTimer=setTimeout(()=>toastEl.style.opacity=0,1300); }
 
-  // ========= WebAudio：SE & BGM（段階的に勇ましく） =========
+  // ---------- WebAudio（SE+BGM/テーマ進行） ----------
   const AudioSys = {
     ctx:null, master:null, sfx:null, bgm:null,
-    on:false, bgmOn:false, bpm:88, tickMS:0, timer:null, step:0,
-    theme:"calm", // "calm" -> "adventure" -> "heroic"
-    density:1 // 音数の多さ（1..3）
+    on:false, bgmOn:false, bpm:86, tickMS:0, timer:null, step:0, theme:'calm', density:1
   };
   function ensureCtx(){
     if (AudioSys.ctx) return;
     const Ctx = window.AudioContext || window.webkitAudioContext;
     const ctx = new Ctx();
-    const master = ctx.createGain(); master.gain.value=0.8; master.connect(ctx.destination);
+    const master = ctx.createGain(); master.gain.value=0.9; master.connect(ctx.destination);
     const sfx = ctx.createGain(); sfx.gain.value=0.9; sfx.connect(master);
     const bgm = ctx.createGain(); bgm.gain.value=0.28; bgm.connect(master);
     AudioSys.ctx=ctx; AudioSys.master=master; AudioSys.sfx=sfx; AudioSys.bgm=bgm;
   }
   function resumeCtx(){ if (AudioSys.ctx && AudioSys.ctx.state!=="running") AudioSys.ctx.resume(); }
-  function setAudioOn(v){
-    ensureCtx(); resumeCtx();
-    AudioSys.on=v;
-    AudioSys.master.gain.value = v?0.9:0.0;
-    updateAudioButtons();
-  }
-  function setBGMOn(v){
-    ensureCtx(); resumeCtx();
-    AudioSys.bgmOn=v;
-    if (v) startBGM(); else stopBGM();
-    updateAudioButtons();
-  }
-  function updateAudioButtons(){
-    $("#btnAudio").textContent = (AudioSys.on?"🔊 音 ON":"🔇 音 OFF");
-    $("#btnBGM").textContent   = (AudioSys.bgmOn?"♪ BGM ON":"♪ BGM OFF");
-  }
+  function setAudioOn(v){ ensureCtx(); resumeCtx(); AudioSys.on=v; AudioSys.master.gain.value=v?0.9:0.0; updateAudioButtons(); }
+  function setBGMOn(v){ ensureCtx(); resumeCtx(); AudioSys.bgmOn=v; if (v) startBGM(); else stopBGM(); updateAudioButtons(); }
+  function updateAudioButtons(){ $("#btnAudio").textContent = (AudioSys.on?"🔊 音 ON":"🔇 音 OFF"); $("#btnBGM").textContent = (AudioSys.bgmOn?"♪ BGM ON":"♪ BGM OFF"); }
 
-  // ---- SFX helpers
-  function oscBurst({freq=440, dur=0.12, type="sine", gain=0.25, glide=0, out="sfx"}={}){
+  function oscBurst({freq=440,dur=0.12,type="sine",gain=0.25,glide=0,out="sfx"}={}){
     if (!AudioSys.on || !AudioSys.ctx) return;
-    const ctx=AudioSys.ctx;
-    const o=ctx.createOscillator(), g=ctx.createGain();
-    o.type=type; o.frequency.value=freq;
-    o.connect(g); g.connect(out==="bgm"?AudioSys.bgm:AudioSys.sfx);
-    const t=ctx.currentTime;
-    g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(gain, t+0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+    const ctx=AudioSys.ctx, o=ctx.createOscillator(), g=ctx.createGain();
+    o.type=type; o.frequency.value=freq; o.connect(g); g.connect(out==="bgm"?AudioSys.bgm:AudioSys.sfx);
+    const t=ctx.currentTime; g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(gain,t+0.01); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
     if (glide) o.frequency.exponentialRampToValueAtTime(Math.max(80,freq*glide), t+dur*0.9);
     o.start(t); o.stop(t+dur+0.02);
   }
-  function noiseBurst({dur=0.18, lp=1200, gain=0.28, out="sfx"}={}){
+  function noiseBurst({dur=0.18,lp=1200,gain=0.28,out="sfx"}={}){
     if (!AudioSys.on || !AudioSys.ctx) return;
-    const ctx=AudioSys.ctx;
-    const buf = ctx.createBuffer(1, ctx.sampleRate*dur, ctx.sampleRate);
-    const data = buf.getChannelData(0);
+    const ctx=AudioSys.ctx, buf=ctx.createBuffer(1,ctx.sampleRate*dur,ctx.sampleRate), data=buf.getChannelData(0);
     for(let i=0;i<data.length;i++) data[i]=Math.random()*2-1;
-    const src = ctx.createBufferSource(); src.buffer=buf;
-    const filter=ctx.createBiquadFilter(); filter.type="lowpass"; filter.frequency.value=lp;
-    const g = ctx.createGain(); g.gain.value=gain;
-    src.connect(filter); filter.connect(g); g.connect(out==="bgm"?AudioSys.bgm:AudioSys.sfx);
-    const t=ctx.currentTime;
-    g.gain.setValueAtTime(0,t);
-    g.gain.linearRampToValueAtTime(gain,t+0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    const src=ctx.createBufferSource(); src.buffer=buf; const filter=ctx.createBiquadFilter(); filter.type="lowpass"; filter.frequency.value=lp;
+    const g=ctx.createGain(); g.gain.value=gain; src.connect(filter); filter.connect(g); g.connect(out==="bgm"?AudioSys.bgm:AudioSys.sfx);
+    const t=ctx.currentTime; g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(gain,t+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
     src.start(t); src.stop(t+dur+0.02);
   }
-  // Public SFX
   const SFX = {
     ui(){ oscBurst({freq:880,dur:0.08,type:"sine",gain:0.18}); },
     place(){ oscBurst({freq:540,dur:0.09,type:"triangle",gain:0.22}); },
@@ -169,105 +147,60 @@
     gameover(){ oscBurst({freq:300,dur:0.3,type:"sine",gain:0.25,glide:0.4}); }
   };
 
-  // ---- BGM：テーマ切替（のどか→冒険→勇ましい）
   function themeForStage(stageIdx){
     if (stageIdx<=3) return {name:"calm", bpm:86, density:1};
     if (stageIdx<=6) return {name:"adventure", bpm:98, density:2};
     return {name:"heroic", bpm:112, density:3};
   }
   function startBGM(){
-    stopBGM();
-    if (!AudioSys.on) return;
-    ensureCtx(); resumeCtx();
-
-    AudioSys.tickMS = (60000/AudioSys.bpm)/4; // 16分音符
-    AudioSys.step = 0;
-
+    stopBGM(); if (!AudioSys.on) return; ensureCtx(); resumeCtx();
+    AudioSys.tickMS = (60000/AudioSys.bpm)/4; AudioSys.step=0;
     AudioSys.timer = setInterval(()=>{
       if (!AudioSys.bgmOn || !AudioSys.on) return;
       const step = AudioSys.step % 16;
       const bar  = Math.floor(AudioSys.step/16) % 8;
-
-      // コード進行：テーマで変える
       let chords;
       if (AudioSys.theme==="calm"){
-        chords = [ // 優しめ（C-Am-F-G）
-          [261.63,329.63,392.00], // C
-          [220.00,261.63,329.63], // Am
-          [174.61,220.00,261.63], // F
-          [196.00,246.94,293.66]  // G
-        ];
+        chords = [[261.63,329.63,392.00],[220.00,261.63,329.63],[174.61,220.00,261.63],[196.00,246.94,293.66]];
       } else if (AudioSys.theme==="adventure"){
-        chords = [ // 前進感（Dm-Bb-F-C）
-          [293.66,349.23,440.00], // Dm
-          [233.08,277.18,349.23], // Bb
-          [174.61,220.00,261.63], // F
-          [261.63,329.63,392.00]  // C
-        ];
+        chords = [[293.66,349.23,440.00],[233.08,277.18,349.23],[174.61,220.00,261.63],[261.63,329.63,392.00]];
       } else {
-        chords = [ // 勇ましい（Em-C-G-D）
-          [329.63,392.00,493.88], // Em
-          [261.63,329.63,392.00], // C
-          [196.00,246.94,392.00], // G(5th up)
-          [293.66,369.99,440.00]  // D
-        ];
+        chords = [[329.63,392.00,493.88],[261.63,329.63,392.00],[196.00,246.94,392.00],[293.66,369.99,440.00]];
       }
-      const ch = chords[bar%chords.length];
-
-      // リズム密度
-      const d = AudioSys.density; // 1..3
-
-      // Kick-ish
+      const ch = chords[bar%chords.length], d=AudioSys.density;
       if (step%8===0) noiseBurst({dur:0.08,lp:400,gain:0.13+0.03*d,out:"bgm"});
-      // Hat
       if (step%2===0) noiseBurst({dur:0.04,lp:6000,gain:0.06+0.02*d,out:"bgm"});
-
-      // Bass（裏拍も追加：密度が上がるほど音が増える）
-      if (step===0 || (d>=2 && step===8) || (d>=3 && step===12)) {
+      if (step===0 || (d>=2 && step===8) || (d>=3 && step===12)){
         oscBurst({freq:ch[0]/2,dur:0.16+0.02*d,type:"sawtooth",gain:0.10+0.02*d,glide:0.9,out:"bgm"});
       }
-
-      // Chord Pluck（密度に応じて頻度UP）
-      if (step%4===0 || (d>=2 && step%4===2)) {
+      if (step%4===0 || (d>=2 && step%4===2)){
         oscBurst({freq:ch[0],dur:0.14,type:"triangle",gain:0.08+0.01*d,out:"bgm"});
         oscBurst({freq:ch[1],dur:0.14,type:"triangle",gain:0.07+0.01*d,out:"bgm"});
         oscBurst({freq:ch[2],dur:0.14,type:"triangle",gain:0.07+0.01*d,out:"bgm"});
       }
-
-      // Lead（密度が上がるほど音数増）
-      if ((d>=1 && step%2===1) || (d>=3 && step%1===0 && step%2===0)){
-        const seq = [0,1,2,1]; // シンプルアルペジオ
-        const note = ch[seq[step%seq.length]];
+      if (d>=1 && step%2===1){
+        const seq=[0,1,2,1]; const note=ch[seq[step%seq.length]];
         oscBurst({freq:note*2,dur:0.10,type:"sine",gain:0.06+0.01*d,out:"bgm"});
       }
-
       AudioSys.step++;
     }, AudioSys.tickMS);
   }
-  function stopBGM(){
-    if (AudioSys.timer){ clearInterval(AudioSys.timer); AudioSys.timer=null; }
-  }
+  function stopBGM(){ if (AudioSys.timer){ clearInterval(AudioSys.timer); AudioSys.timer=null; } }
   function applyTheme(stageIdx, waveIdx){
-    const t = themeForStage(stageIdx);
-    AudioSys.theme = t.name;
-    // ステージとウェーブでBPM/密度を上げる
+    const t=themeForStage(stageIdx); AudioSys.theme=t.name;
     const waveBoost = Math.min(12, Math.floor((waveIdx||0)/2)*2);
-    AudioSys.bpm = t.bpm + waveBoost;
-    AudioSys.density = t.density + (waveIdx>6?1:0);
-    if (AudioSys.bgmOn && AudioSys.on){ startBGM(); } // 反映のため再始動
+    AudioSys.bpm = t.bpm + waveBoost; AudioSys.density = t.density + (waveIdx>6?1:0);
+    if (AudioSys.bgmOn && AudioSys.on) startBGM();
   }
 
-  // ========= ゲーム定数 =========
-  const COLS=24, ROWS=15; // グリッド
-  let TILE=40; // fitで上書き
+  // ---------- ゲーム定数 ----------
+  const COLS=24, ROWS=15; let TILE=40;
   const PATH=2, BUILD=1, BLOCK=0;
-  // タワースペック
   const TowerSpec = {
     archer:{ name:"アーチャー", cost:60, range:3.6, rate:0.65, dmg:18, fly:true, aoe:0, slow:0, upScale:1.55 },
     cannon:{ name:"キャノン",   cost:80, range:3.2, rate:1.1,  dmg:28, fly:false,aoe:1.2, slow:0, upScale:1.6  },
     ice:   { name:"アイス",     cost:70, range:3.0, rate:1.2,  dmg:4,  fly:true, aoe:0.8, slow:0.45, upScale:1.6 }
   };
-  // 敵スペック
   const EnemySpec = {
     slime:{ hp:60,  spd:1.0,  gold:7,  fly:false, color:"#67e8f9" },
     wolf: { hp:55,  spd:1.7,  gold:8,  fly:false, color:"#f59e0b" },
@@ -276,7 +209,7 @@
     boss: { hp:850, spd:0.8,  gold:60, fly:false, color:"#f472b6" }
   };
 
-  // ========= ステージデータ（10面） =========
+  // ---------- ステージ ----------
   function blank() { return Array.from({length:ROWS}, _=> Array(COLS).fill(BUILD)); }
   function carvePath(grid, pts){
     const inb=(x,y)=>x>=0&&y>=0&&x<COLS&&y<ROWS;
@@ -296,271 +229,129 @@
     for(let y=0;y<ROWS;y++){ grid[y][0]=BLOCK; grid[y][COLS-1]=BLOCK; }
     return grid;
   }
+  function buildPathFromPts(pts) { return pts.map(([x,y]) => ({x:(x+0.5), y:(y+0.5)})); }
   const Stages = [
     { name:"草原の道", life:20, gold:120, pathPts:[[1,7],[6,7],[6,3],[12,3],[12,11],[20,11],[22,11]], waves:[
-      ["slime,10"], ["slime,12"], ["wolf,8"], ["slime,10|wolf,6"], ["orc,6"], ["bat,10"], ["orc,6|wolf,8"],
-      ["slime,14|bat,6"], ["orc,10"], ["boss,1|wolf,12"]
+      ["slime,10"],["slime,12"],["wolf,8"],["slime,10|wolf,6"],["orc,6"],["bat,10"],["orc,6|wolf,8"],["slime,14|bat,6"],["orc,10"],["boss,1|wolf,12"]
     ]},
     { name:"曲がりくねる丘", life:18, gold:110, pathPts:[[1,2],[20,2],[20,6],[3,6],[3,11],[22,11]], waves:[
-      ["slime,12"],["wolf,10"],["slime,10|wolf,6"],["orc,6"],["bat,10"],["orc,8|wolf,8"],["slime,20"],
-      ["orc,10|bat,8"],["orc,10|wolf,12"],["boss,1|orc,10|bat,10"]
+      ["slime,12"],["wolf,10"],["slime,10|wolf,6"],["orc,6"],["bat,10"],["orc,8|wolf,8"],["slime,20"],["orc,10|bat,8"],["orc,10|wolf,12"],["boss,1|orc,10|bat,10"]
     ]},
     { name:"湾曲平原", life:18, gold:120, pathPts:[[1,4],[8,4],[8,9],[16,9],[16,5],[22,5],[22,12]], waves:[
-      ["slime,14"],["wolf,12"],["orc,6"],["bat,12"],["slime,12|orc,6"],["wolf,14"],["orc,10"],
-      ["bat,14|slime,10"],["orc,12|wolf,10"],["boss,1|wolf,14"]
+      ["slime,14"],["wolf,12"],["orc,6"],["bat,12"],["slime,12|orc,6"],["wolf,14"],["orc,10"],["bat,14|slime,10"],["orc,12|wolf,10"],["boss,1|wolf,14"]
     ]},
     { name:"長い街道", life:16, gold:140, pathPts:[[1,7],[10,7],[10,3],[14,3],[14,11],[20,11],[23,11]], waves:[
-      ["slime,16"],["wolf,12"],["orc,8"],["bat,12"],["slime,16|wolf,8"],["orc,10"],["bat,16"],
-      ["orc,10|wolf,12"],["orc,12|bat,12"],["boss,1|orc,12|wolf,12"]
+      ["slime,16"],["wolf,12"],["orc,8"],["bat,12"],["slime,16|wolf,8"],["orc,10"],["bat,16"],["orc,10|wolf,12"],["orc,12|bat,12"],["boss,1|orc,12|wolf,12"]
     ]},
     { name:"石畳の折返し", life:16, gold:150, pathPts:[[1,3],[12,3],[12,12],[22,12]], waves:[
-      ["slime,16"],["wolf,14"],["orc,8"],["bat,14"],["slime,14|wolf,10"],["orc,10"],["bat,16"],
-      ["orc,12|wolf,12"],["orc,14|bat,12"],["boss,1|orc,12|wolf,14"]
+      ["slime,16"],["wolf,14"],["orc,8"],["bat,14"],["slime,14|wolf,10"],["orc,10"],["bat,16"],["orc,12|wolf,12"],["orc,14|bat,12"],["boss,1|orc,12|wolf,14"]
     ]},
     { name:"蛇の谷", life:14, gold:160, pathPts:[[1,6],[6,6],[6,10],[11,10],[11,4],[16,4],[16,10],[22,10],[22,12]], waves:[
-      ["slime,18"],["wolf,16"],["orc,10"],["bat,16"],["slime,18|wolf,12"],["orc,12"],["bat,18"],
-      ["orc,12|wolf,14"],["orc,14|bat,14"],["boss,1|orc,14|wolf,16"]
+      ["slime,18"],["wolf,16"],["orc,10"],["bat,16"],["slime,18|wolf,12"],["orc,12"],["bat,18"],["orc,12|wolf,14"],["orc,14|bat,14"],["boss,1|orc,14|wolf,16"]
     ]},
     { name:"段丘の道", life:14, gold:170, pathPts:[[1,11],[6,11],[6,3],[12,3],[12,11],[18,11],[18,6],[23,6]], waves:[
-      ["slime,18"],["wolf,18"],["orc,12"],["bat,18"],["slime,18|wolf,14"],["orc,14"],["bat,18"],
-      ["orc,14|wolf,16"],["orc,16|bat,16"],["boss,1|orc,16|wolf,18"]
+      ["slime,18"],["wolf,18"],["orc,12"],["bat,18"],["slime,18|wolf,14"],["orc,14"],["bat,18"],["orc,14|wolf,16"],["orc,16|bat,16"],["boss,1|orc,16|wolf,18"]
     ]},
     { name:"風鳴りの平地", life:12, gold:180, pathPts:[[1,5],[9,5],[9,10],[17,10],[17,5],[23,5]], waves:[
-      ["wolf,18"],["wolf,18|bat,12"],["slime,20"],["orc,12"],["bat,18"],["slime,16|wolf,16"],["orc,16"],
-      ["bat,20|wolf,16"],["orc,18|bat,18"],["boss,1|wolf,20"]
+      ["wolf,18"],["wolf,18|bat,12"],["slime,20"],["orc,12"],["bat,18"],["slime,16|wolf,16"],["orc,16"],["bat,20|wolf,16"],["orc,18|bat,18"],["boss,1|wolf,20"]
     ]},
     { name:"巨兵の行軍", life:12, gold:190, pathPts:[[1,9],[8,9],[8,4],[15,4],[15,11],[23,11]], waves:[
-      ["orc,14"],["orc,14|slime,20"],["orc,16"],["bat,18"],["wolf,20"],["orc,18|bat,18"],["orc,20"],
-      ["wolf,22|bat,20"],["orc,22"],["boss,1|orc,18|wolf,18"]
+      ["orc,14"],["orc,14|slime,20"],["orc,16"],["bat,18"],["wolf,20"],["orc,18|bat,18"],["orc,20"],["wolf,22|bat,20"],["orc,22"],["boss,1|orc,18|wolf,18"]
     ]},
     { name:"黒鉄の終路", life:12, gold:220, pathPts:[[1,7],[6,7],[6,3],[12,3],[12,11],[18,11],[18,5],[23,5]], waves:[
-      ["slime,24|wolf,18"],["orc,18"],["bat,22"],["orc,20|wolf,20"],["bat,24|slime,20"],
-      ["orc,22|bat,22"],["wolf,26"],["orc,24"],["orc,20|wolf,22|bat,22"],["boss,2"]
+      ["slime,24|wolf,18"],["orc,18"],["bat,22"],["orc,20|wolf,20"],["bat,24|slime,20"],["orc,22|bat,22"],["wolf,26"],["orc,24"],["orc,20|wolf,22|bat,22"],["boss,2"]
     ]}
-  ].map(s=>{
-    const g=carvePath(blank(), s.pathPts);
-    const path=buildPathFromPts(s.pathPts);
-    return {...s, grid:g, waypoints:path};
-  });
+  ].map(s=>({ ...s, grid:carvePath(blank(), s.pathPts), waypoints:buildPathFromPts(s.pathPts) }));
 
-  function buildPathFromPts(pts) { return pts.map(([x,y]) => ({x:(x+0.5), y:(y+0.5)})); }
+  // ---------- 状態 ----------
+  let G = { stageIdx:0, grid:null, way:null, life:20, gold:100, waveIdx:0, waveMax:0, running:false, paused:false, speed:1, towers:[], bullets:[], enemies:[], sel:null, building:null, tick:0 };
+  const SAVE_KEY="RG10_SAVE_V3";
+  const lifeEl=$("#life"), goldEl=$("#gold"), waveEl=$("#wave"), waveMaxEl=$("#waveMax"), stageEl=$("#stage");
+  const btnStart=$("#btnStart"), btnPause=$("#btnPause"), btnSpeed=$("#btnSpeed"), btnUp=$("#btnUpgrade"), btnSell=$("#btnSell"), btnNextStage=$("#btnNextStage");
+  const upCostEl=$("#upCost"), sellAmtEl=$("#sellAmt"); const btnAudio=$("#btnAudio"), btnBGM=$("#btnBGM");
 
-  // ========= ゲーム状態 =========
-  let G = {
-    stageIdx: 0, grid: null, way: null,
-    life: 20, gold: 100,
-    waveIdx: 0, waveMax: 0,
-    running: false, paused: false, speed: 1,
-    towers: [], bullets: [], enemies: [],
-    sel: null, building: null, tick: 0
-  };
+  function saveProgress(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify({ stageIdx:G.stageIdx, unlocked:G.stageIdx+1 })); }catch(e){} }
+  function loadProgress(){ try{ const r=localStorage.getItem(SAVE_KEY); return r?JSON.parse(r):null; }catch(e){ return null; } }
 
-  // ========= 保存 =========
-  const SAVE_KEY="RG10_SAVE_V2";
-  function saveProgress() {
-    localStorage.setItem(SAVE_KEY, JSON.stringify({ stageIdx: G.stageIdx, unlocked: G.stageIdx+1 }));
-  }
-  function loadProgress() {
-    const raw = localStorage.getItem(SAVE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  }
-
-  // ========= UI =========
-  const lifeEl  = $("#life");
-  const goldEl  = $("#gold");
-  const waveEl  = $("#wave");
-  const waveMaxEl=$("#waveMax");
-  const stageEl = $("#stage");
-  const btnStart=$("#btnStart");
-  const btnPause=$("#btnPause");
-  const btnSpeed=$("#btnSpeed");
-  const btnUp=$("#btnUpgrade");
-  const btnSell=$("#btnSell");
-  const btnNextStage=$("#btnNextStage");
-  const upCostEl=$("#upCost"), sellAmtEl=$("#sellAmt");
-  const btnAudio=$("#btnAudio"), btnBGM=$("#btnBGM");
-
-  // ========= ステージ開始 =========
-  function startStage(i=0) {
-    const s = Stages[i];
-    G.stageIdx=i;
-    G.grid = s.grid.map(r=>r.slice());
-    G.way = s.waypoints;
-    G.life = s.life;
-    G.gold = s.gold;
-    G.waveIdx=0;
-    G.waveMax = s.waves.length;
-    G.running = false;
-    G.paused = false;
-    G.speed = 1;
+  // ---------- ステージ開始 ----------
+  function startStage(i=0){
+    const s=Stages[i]; if (!s) return;
+    G.stageIdx=i; G.grid=s.grid.map(r=>r.slice()); G.way=s.waypoints; G.life=s.life; G.gold=s.gold;
+    G.waveIdx=0; G.waveMax=s.waves.length; G.running=false; G.paused=false; G.speed=1;
     G.towers.length=0; G.bullets.length=0; G.enemies.length=0; G.sel=null; G.building=null; G.tick=0;
-    fit();
-    updateHUD();
-    toast(`Stage ${i+1}: ${s.name}`);
-    // BGMテーマ反映（のどか→冒険→勇ましい）
-    applyTheme(G.stageIdx, G.waveIdx);
+    fit(); updateHUD(); toast(`Stage ${i+1}: ${s.name}`); applyTheme(G.stageIdx, G.waveIdx);
   }
 
-  // ========= ウェーブ制御 =========
+  // ---------- ウェーブ ----------
   let spawning=false, spawnQueue=[];
-  function parsePack(p) { return p.split("|").map(s=>{ const [t,n]=s.split(","); return {type:t.trim(), n:parseInt(n.trim()||"1")}; }); }
-  function startWave() {
-    if (G.running || spawning) return;
-    const s=Stages[G.stageIdx];
-    if (G.waveIdx>=s.waves.length) return;
-    G.running=true; spawning=true;
-    const packs = parsePack(s.waves[G.waveIdx]);
-    spawnQueue.length=0;
-    for (const pk of packs){ for(let i=0;i<pk.n;i++) spawnQueue.push(pk.type); }
-    SFX.start();
-    // ウェーブでテンション上げる
-    applyTheme(G.stageIdx, G.waveIdx);
+  function parsePack(p){ return p.split("|").map(s=>{ const [t,n]=s.split(","); return {type:t.trim(), n:parseInt(n.trim()||"1")}; }); }
+  function startWave(){
+    if (G.running||spawning) return; const s=Stages[G.stageIdx]; if (G.waveIdx>=s.waves.length) return;
+    G.running=true; spawning=true; spawnQueue.length=0;
+    for (const pk of parsePack(s.waves[G.waveIdx])){ for(let i=0;i<pk.n;i++) spawnQueue.push(pk.type); }
+    SFX.start(); applyTheme(G.stageIdx, G.waveIdx);
   }
-  function waveDone() {
+  function waveDone(){
     G.running=false; G.waveIdx++;
-    if (G.waveIdx>=G.waveMax){
-      toast("ステージクリア！ 下のボタンから次へ");
-      SFX.clear();
-      saveProgress();
-    } else {
-      toast(`Wave ${G.waveIdx}/${G.waveMax} クリア`);
-      SFX.ui();
-    }
+    if (G.waveIdx>=G.waveMax){ toast("ステージクリア！ 下のボタンから次へ"); SFX.clear(); saveProgress(); }
+    else { toast(`Wave ${G.waveIdx}/${G.waveMax} クリア`); SFX.ui(); }
     updateHUD();
   }
 
-  // ========= 敵生成 =========
-  function spawnEnemy(type) {
-    const sp=EnemySpec[type]||EnemySpec.slime;
-    const pos={...G.way[0]};
-    return {
-      type, x:pos.x, y:pos.y, i:0, t:0,
-      hp:sp.hp, hpMax:sp.hp, spd:sp.spd, gold:sp.gold, fly:sp.fly,
-      slow:0, slowT:0, color:sp.color, dead:false
-    };
-  }
-
-  // ========= タワー操作 =========
-  function canBuildAt(cx,cy) {
-    if (cx<0||cy<0||cx>=COLS||cy>=ROWS) return false;
-    if (G.grid[cy][cx]!==BUILD) return false;
-    for (const t of G.towers){ if (t.cx===cx && t.cy===cy) return false; }
-    return true;
-  }
-  function addTower(type, cx, cy) {
-    const spec=TowerSpec[type];
-    if (!spec) return false;
-    if (G.gold<spec.cost) { toast("お金が足りない"); return false; }
-    if (!canBuildAt(cx,cy)) { toast("そこには置けません"); return false; }
-    G.gold -= spec.cost;
-    const tower = {type, cx, cy, lv:1, cd:0, ...cloneSpec(spec)};
-    G.towers.push(tower);
-    SFX.place();
-    updateHUD();
-    return true;
-  }
+  // ---------- 生成・塔・攻撃 ----------
+  function spawnEnemy(type){ const sp=EnemySpec[type]||EnemySpec.slime; const pos={...G.way[0]}; return {type, x:pos.x, y:pos.y, i:0, t:0, hp:sp.hp, hpMax:sp.hp, spd:sp.spd, gold:sp.gold, fly:sp.fly, slow:0, slowT:0, color:sp.color, dead:false}; }
+  function canBuildAt(cx,cy){ if (cx<0||cy<0||cx>=COLS||cy>=ROWS) return false; if (G.grid[cy][cx]!==BUILD) return false; return !G.towers.some(t=>t.cx===cx && t.cy===cy); }
   function cloneSpec(s){ return {range:s.range, rate:s.rate, dmg:s.dmg, fly:s.fly, aoe:s.aoe, slow:s.slow, baseCost:s.cost, upScale:s.upScale}; }
-  function towerCostToUpgrade(t){ return Math.round(t.baseCost * Math.pow(t.upScale, t.lv-1) * 0.8); }
-  function towerSellPrice(t){
-    let invest = t.baseCost;
-    for (let i=1;i<t.lv;i++) invest += Math.round(t.baseCost*Math.pow(t.upScale,i-1)*0.8);
-    return Math.round(invest*0.6);
+  function addTower(type,cx,cy){
+    const spec=TowerSpec[type]; if (!spec) return false;
+    if (G.gold<spec.cost){ toast("お金が足りない"); return false; }
+    if (!canBuildAt(cx,cy)){ toast("そこには置けません"); return false; }
+    G.gold-=spec.cost; const tower={type,cx,cy,lv:1,cd:0,...cloneSpec(spec)}; G.towers.push(tower); SFX.place(); updateHUD(); return true;
   }
-  function upgradeSel() {
-    if (!G.sel) return;
-    const t=G.sel, cost=towerCostToUpgrade(t);
-    if (G.gold<cost) { toast("お金が足りない"); return; }
-    G.gold -= cost;
-    t.lv++; t.range *= 1.08; t.rate *= 0.93; t.dmg = Math.round(t.dmg*1.2);
-    SFX.upgrade();
-    updateHUD(); toast("強化した！");
-  }
-  function sellSel(){
-    if (!G.sel) return;
-    const val=towerSellPrice(G.sel);
-    G.gold += val;
-    G.towers = G.towers.filter(x=>x!==G.sel);
-    G.sel=null; updateHUD(); SFX.sell(); toast("売却した");
-  }
+  function towerCostToUpgrade(t){ return Math.round(t.baseCost*Math.pow(t.upScale,t.lv-1)*0.8); }
+  function towerSellPrice(t){ let invest=t.baseCost; for(let i=1;i<t.lv;i++) invest+=Math.round(t.baseCost*Math.pow(t.upScale,i-1)*0.8); return Math.round(invest*0.6); }
+  function upgradeSel(){ if(!G.sel)return; const t=G.sel,c=towerCostToUpgrade(t); if(G.gold<c){toast("お金が足りない");return;} G.gold-=c; t.lv++; t.range*=1.08; t.rate*=0.93; t.dmg=Math.round(t.dmg*1.2); SFX.upgrade(); updateHUD(); toast("強化した！"); }
+  function sellSel(){ if(!G.sel)return; const v=towerSellPrice(G.sel); G.gold+=v; G.towers=G.towers.filter(x=>x!==G.sel); G.sel=null; updateHUD(); SFX.sell(); toast("売却した"); }
+  function inRange(t,e){ const dx=(e.x-(t.cx+0.5)), dy=(e.y-(t.cy+0.5)); return (dx*dx+dy*dy) <= (t.range*t.range); }
+  function pickTarget(t){ let best=null,bp=-1; for(const e of G.enemies){ if(e.dead)continue; if(!inRange(t,e))continue; if(!t.fly && e.fly)continue; const prog=e.i+e.t; if(prog>bp){best=e;bp=prog;} } return best; }
 
-  // ========= ターゲット選定 =========
-  function inRange(t, e) {
-    const dx=(e.x - (t.cx+0.5)), dy=(e.y - (t.cy+0.5));
-    return (dx*dx+dy*dy) <= (t.range*t.range);
-  }
-  function pickTarget(t) {
-    let best=null, bestProg=-1;
-    for (const e of G.enemies){
-      if (e.dead) continue;
-      if (!inRange(t,e)) continue;
-      if (!t.fly && e.fly) continue;
-      const prog = e.i + e.t;
-      if (prog>bestProg){ best=e; bestProg=prog; }
-    }
-    return best;
-  }
-
-  // ========= ループ =========
+  // ---------- ループ ----------
   let last=0;
   function loop(ts){
     requestAnimationFrame(loop);
-    const dt = Math.min(40, ts-last) || 16; last=ts;
-    const mul = (G.paused?0:1)*G.speed;
-    if (!mul) { render(); return; }
+    const dt=Math.min(40,ts-last)||16; last=ts;
+    const mul=(G.paused?0:1)*G.speed; if(!mul){ render(); return; }
 
-    // スポーン
     if (spawning){
-      if (spawnQueue.length>0 && (G.tick%10===0)) {
-        const type = spawnQueue.shift();
-        G.enemies.push(spawnEnemy(type));
-      }
+      if (spawnQueue.length>0 && (G.tick%10===0)){ G.enemies.push(spawnEnemy(spawnQueue.shift())); }
       if (spawnQueue.length===0) spawning=false;
     }
 
-    // 敵更新
     for (const e of G.enemies){
       if (e.dead) continue;
-      let spd = e.spd * (e.slow>0 ? (1 - e.slow) : 1);
-      e.slowT = Math.max(0, e.slowT - dt*0.001*mul);
-      if (e.slowT<=0) e.slow=0;
-      const w=G.way;
-      const a=w[e.i], b=w[e.i+1];
-      if (!b){
-        e.dead=true; G.life -= 1; updateHUD(); if (G.life<=0){ gameOver(); return; }
-        continue;
-      }
-      const dx=b.x - a.x, dy=b.y - a.y;
-      const segLen = Math.hypot(dx,dy);
-      const step = (spd * dt*0.0025 * mul) / Math.max(0.0001, segLen);
-      e.t += step;
-      if (e.t>=1){ e.i++; e.t=0; }
-      e.x = a.x + dx*e.t;
-      e.y = a.y + dy*e.t;
+      const spd = e.spd * (e.slow>0 ? (1 - e.slow) : 1);
+      e.slowT = Math.max(0, e.slowT - dt*0.001*mul); if (e.slowT<=0) e.slow=0;
+      const w=G.way, a=w[e.i], b=w[e.i+1];
+      if (!b){ e.dead=true; G.life-=1; updateHUD(); if (G.life<=0){ gameOver(); return; } continue; }
+      const dx=b.x-a.x, dy=b.y-a.y, segLen=Math.hypot(dx,dy), step=(spd*dt*0.0025*mul)/Math.max(0.0001,segLen);
+      e.t += step; if (e.t>=1){ e.i++; e.t=0; } e.x=a.x+dx*e.t; e.y=a.y+dy*e.t;
     }
 
-    // タワー攻撃
     for (const t of G.towers){
-      t.cd -= dt*0.001*mul;
-      if (t.cd>0) continue;
-      const target = pickTarget(t);
-      if (!target) continue;
-      t.cd = t.rate;
-      if (t.aoe>0){
+      t.cd -= dt*0.001*mul; if (t.cd>0) continue;
+      const target=pickTarget(t); if (!target) continue; t.cd=t.rate;
+      if (t.aoe>0){ // AOE/鈍足タイプ
         G.bullets.push({x:(t.cx+0.5), y:(t.cy+0.5), tx:target.x, ty:target.y, spd:12, aoe:t.aoe, dmg:t.dmg, slow:t.slow, ttl:1.2, type:t.type});
         if (t.type==="cannon") SFX.shotCannon(); else SFX.shotIce();
       } else {
-        G.bullets.push({x:(t.cx+0.5), y:(t.cy+0.5), tx:target.x, ty:target.y, spd:18, aoe:0,   dmg:t.dmg, slow:t.slow, ttl:1.8, type:t.type});
+        G.bullets.push({x:(t.cx+0.5), y:(t.cy+0.5), tx:target.x, ty:target.y, spd:18, aoe:0, dmg:t.dmg, slow:t.slow, ttl:1.8, type:t.type});
         SFX.shotArcher();
       }
     }
 
-    // 弾体
     for (const b of G.bullets){
-      const dx=b.tx - b.x, dy=b.ty - b.y;
-      const len=Math.hypot(dx,dy)||1;
-      const vx=(dx/len)*b.spd*dt*0.01*mul, vy=(dy/len)*b.spd*dt*0.01*mul;
-      b.x += vx; b.y += vy; b.ttl -= dt*0.001*mul;
-
+      const dx=b.tx-b.x, dy=b.ty-b.y, len=Math.hypot(dx,dy)||1;
+      b.x += (dx/len)*b.spd*dt*0.01*mul; b.y += (dy/len)*b.spd*dt*0.01*mul; b.ttl -= dt*0.001*mul;
       for (const e of G.enemies){
         if (e.dead) continue;
         const d2=(e.x-b.x)*(e.x-b.x)+(e.y-b.y)*(e.y-b.y);
@@ -569,218 +360,125 @@
           if (b.aoe>0){
             for (const e2 of G.enemies){
               if (e2.dead) continue;
-              const d2b=(e2.x-b.x)*(e2.x-b.x)+(e2.y-b.y)*(e2.x-b.x)+(e2.y-b.y); // (typo fix not needed visually)
-              const dd = (e2.x-b.x)*(e2.x-b.x)+(e2.y-b.y)*(e2.y-b.y);
-              if (dd<=b.aoe*b.aoe && (!e2.fly || (e2.fly && TowerSpec.ice.fly))){
-                applyHit(e2, b);
-              }
+              const dd=(e2.x-b.x)*(e2.x-b.x)+(e2.y-b.y)*(e2.y-b.y);
+              if (dd<=b.aoe*b.aoe && (!e2.fly || (e2.fly && TowerSpec.ice.fly))) applyHit(e2,b);
             }
             SFX.boom();
-          } else {
-            applyHit(e, b);
-            SFX.hit();
-          }
+          } else { applyHit(e,b); SFX.hit(); }
           b.ttl=0; break;
         }
       }
     }
     G.bullets = G.bullets.filter(b=>b.ttl>0);
 
-    // ウェーブ終了判定
-    if (G.running && !spawning && G.enemies.every(e=>e.dead)){
-      waveDone();
-    }
+    if (G.running && !spawning && G.enemies.every(e=>e.dead)) waveDone();
 
-    G.tick++;
-    render();
+    G.tick++; render();
   }
 
-  function applyHit(e, b){
-    e.hp -= b.dmg;
-    if (b.slow>0){ e.slow = Math.max(e.slow, b.slow); e.slowT = 1.2; }
-    if (e.hp<=0){ e.dead=true; G.gold += e.gold; updateHUD(); SFX.coin(); }
-  }
+  function applyHit(e,b){ e.hp-=b.dmg; if (b.slow>0){ e.slow=Math.max(e.slow,b.slow); e.slowT=1.2; } if (e.hp<=0){ e.dead=true; G.gold+=e.gold; updateHUD(); SFX.coin(); } }
 
-  // ========= 描画 =========
-  function render() {
-    ctx.save();
-    ctx.scale(DPR,DPR);
-    ctx.clearRect(0,0,cv.width/DPR,cv.height/DPR);
-
+  // ---------- 描画（少し明るめ） ----------
+  function render(){
+    ctx.save(); ctx.scale(DPR,DPR);
+    const W=cv.width/DPR, H=cv.height/DPR; ctx.clearRect(0,0,W,H);
     for (let y=0;y<ROWS;y++){
       for (let x=0;x<COLS;x++){
-        const v=G.grid[y][x];
-        const px=x*TILE, py=y*TILE;
-        if (v===BLOCK){ ctx.fillStyle="#0a0e14"; }
-        else if (v===PATH){ ctx.fillStyle="#19212d"; }
-        else { ctx.fillStyle="#0f1520"; }
-        ctx.fillRect(px,py,TILE, TILE);
-        ctx.fillStyle="rgba(255,255,255,.03)";
-        ctx.fillRect(px,py,TILE-1,1);
-        ctx.fillRect(px,py,TILE,1);
+        const v=G.grid?.[y]?.[x]; const px=x*TILE, py=y*TILE;
+        if (v===PATH){ ctx.fillStyle="#223142"; }
+        else if (v===BUILD){ ctx.fillStyle="#19263a"; }
+        else { ctx.fillStyle="#0e1724"; }
+        ctx.fillRect(px,py,TILE,TILE);
+        ctx.fillStyle="rgba(255,255,255,.05)"; ctx.fillRect(px,py,TILE,1); ctx.fillRect(px,py,1,TILE);
       }
     }
-
     for (const t of G.towers){
       const cx=(t.cx+0.5)*TILE, cy=(t.cy+0.5)*TILE;
-      if (G.sel===t){
-        ctx.beginPath(); ctx.arc(cx,cy,t.range*TILE,0,Math.PI*2);
-        ctx.strokeStyle="rgba(76,201,240,.35)"; ctx.lineWidth=2; ctx.stroke();
-      }
+      if (G.sel===t){ ctx.beginPath(); ctx.arc(cx,cy,t.range*TILE,0,Math.PI*2); ctx.strokeStyle="rgba(76,201,240,.35)"; ctx.lineWidth=2; ctx.stroke(); }
       ctx.fillStyle = t.type==="archer" ? "#4cc9f0" : (t.type==="cannon"?"#f59e0b":"#8be9fd");
       ctx.beginPath(); ctx.arc(cx,cy,TILE*0.36,0,Math.PI*2); ctx.fill();
-      ctx.fillStyle="#fff"; ctx.font="600 12px system-ui"; ctx.textAlign="center";
-      ctx.fillText(t.lv.toString(), cx, cy+4);
+      ctx.fillStyle="#fff"; ctx.font="600 12px system-ui"; ctx.textAlign="center"; ctx.fillText(t.lv.toString(), cx, cy+4);
     }
-
     for (const e of G.enemies){
-      if (e.dead) continue;
-      const x=e.x*TILE, y=e.y*TILE;
-      ctx.fillStyle="rgba(0,0,0,.3)";
-      ctx.beginPath(); ctx.ellipse(x,y+6,12,6,0,0,Math.PI*2); ctx.fill();
-      ctx.fillStyle=e.color;
-      ctx.beginPath(); ctx.arc(x,y,12,0,Math.PI*2); ctx.fill();
-      const w=26, h=5;
-      ctx.fillStyle="#111"; ctx.fillRect(x-w/2,y-20,w,h);
+      if (e.dead) continue; const x=e.x*TILE, y=e.y*TILE;
+      ctx.fillStyle="rgba(0,0,0,.3)"; ctx.beginPath(); ctx.ellipse(x,y+6,12,6,0,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle=e.color; ctx.beginPath(); ctx.arc(x,y,12,0,Math.PI*2); ctx.fill();
+      const w=26,h=5; ctx.fillStyle="#111"; ctx.fillRect(x-w/2,y-20,w,h);
       ctx.fillStyle="#22c55e"; ctx.fillRect(x-w/2,y-20, Math.max(0, w*(e.hp/e.hpMax)), h);
       if (e.slow>0){ ctx.fillStyle="#60a5fa"; ctx.fillRect(x-w/2,y-26, w*(e.slow), 3); }
     }
-
     for (const b of G.bullets){
-      const x=b.x*TILE, y=b.y*TILE;
-      ctx.fillStyle=b.aoe>0?"#fde047":"#fca5a5";
-      if (b.aoe>0){ ctx.beginPath(); ctx.arc(x,y,6,0,Math.PI*2); ctx.fill(); }
-      else { ctx.fillRect(x-3,y-3,6,6); }
+      const x=b.x*TILE, y=b.y*TILE; ctx.fillStyle=b.aoe>0?"#fde047":"#fca5a5";
+      if (b.aoe>0){ ctx.beginPath(); ctx.arc(x,y,6,0,Math.PI*2); ctx.fill(); } else { ctx.fillRect(x-3,y-3,6,6); }
     }
-
-    // 建設プレビュー
-    if (G.building){
-      const {cx,cy}=hoverCell;
-      if (cx>=0){
-        const ok = canBuildAt(cx,cy);
-        ctx.strokeStyle = ok? "rgba(76,201,240,.8)" : "rgba(239,68,68,.8)";
-        ctx.lineWidth=3;
-        ctx.strokeRect(cx*TILE+2, cy*TILE+2, TILE-4, TILE-4);
-      }
-    }
-
     ctx.restore();
   }
 
-  // ========= 入力（Pointerで統一） =========
+  // ---------- 入力（Pointerで統一） ----------
   let hoverCell={cx:-1,cy:-1};
   function getCellFromEvent(ev){
     const r=cv.getBoundingClientRect();
-    const x = (ev.touches?.[0]?.clientX ?? ev.clientX) - r.left;
-    const y = (ev.touches?.[0]?.clientY ?? ev.clientY) - r.top;
-    const gx = Math.floor(x / (cv.clientWidth/COLS));
-    const gy = Math.floor(y / (cv.clientHeight/ROWS));
-    return {cx:gx, cy:gy};
+    const x=(ev.clientX ?? ev.touches?.[0]?.clientX)-r.left;
+    const y=(ev.clientY ?? ev.touches?.[0]?.clientY)-r.top;
+    const gx=Math.floor(x/(cv.clientWidth/COLS)); const gy=Math.floor(y/(cv.clientHeight/ROWS)); return {cx:gx,cy:gy};
   }
   cv.addEventListener('pointermove', e=>{ hoverCell=getCellFromEvent(e); });
   function onCanvasTap(ev){
-    const {cx,cy}=getCellFromEvent(ev);
-    if (cx<0||cy<0||cx>=COLS||cy>=ROWS) return;
-    if (G.building){
-      if (addTower(G.building.type, cx, cy)){
-        G.building=null; clearSelShop();
-      }
-    } else {
-      selectTowerAt(cx,cy);
-    }
+    const {cx,cy}=getCellFromEvent(ev); if (cx<0||cy<0||cx>=COLS||cy>=ROWS) return;
+    if (G.building){ if (addTower(G.building.type,cx,cy)){ G.building=null; clearSelShop(); } }
+    else { selectTowerAt(cx,cy); }
   }
-  cv.addEventListener('pointerdown', (e)=>{ onCanvasTap(e); });
+  cv.addEventListener('pointerdown', e=>{ e.preventDefault(); onCanvasTap(e); });
 
   function selectTowerAt(cx,cy){
     G.sel = G.towers.find(t=>t.cx===cx && t.cy===cy) || null;
-    if (G.sel){
-      upCostEl.textContent = String(towerCostToUpgrade(G.sel));
-      sellAmtEl.textContent = String(towerSellPrice(G.sel));
-    } else {
-      upCostEl.textContent = "-"; sellAmtEl.textContent="-";
-    }
+    if (G.sel){ upCostEl.textContent=String(towerCostToUpgrade(G.sel)); sellAmtEl.textContent=String(towerSellPrice(G.sel)); }
+    else { upCostEl.textContent="-"; sellAmtEl.textContent="-"; }
   }
 
-  // ========= ボタン（pointerdownで反応） =========
-  function bindPointer(el, fn){
-    el.addEventListener('pointerdown', e=>{ e.preventDefault(); fn(); });
-  }
+  // ---------- ボタン（pointerdown） ----------
+  function bindPointer(el,fn){ el.addEventListener('pointerdown', e=>{ e.preventDefault(); fn(); }); }
   bindPointer(btnStart, ()=>{ startWave(); SFX.ui(); toast('Wave開始'); });
-  bindPointer(btnPause, ()=>{ G.paused=!G.paused; btnPause.textContent = G.paused?'▶':'⏸'; SFX.ui(); toast(G.paused?'一時停止':'再開'); });
-  bindPointer(btnSpeed, ()=>{ G.speed = (G.speed===1?2:1); btnSpeed.textContent = `⏩ ×${G.speed}`; SFX.ui(); toast(`速度×${G.speed}`); });
+  bindPointer(btnPause, ()=>{ G.paused=!G.paused; btnPause.textContent=G.paused?'▶':'⏸'; SFX.ui(); toast(G.paused?'一時停止':'再開'); });
+  bindPointer(btnSpeed, ()=>{ G.speed=(G.speed===1?2:1); btnSpeed.textContent=`⏩ ×${G.speed}`; SFX.ui(); toast(`速度×${G.speed}`); });
   bindPointer(btnUp, ()=> upgradeSel());
   bindPointer(btnSell, ()=> sellSel());
   bindPointer(btnNextStage, ()=>{
-    if (G.waveIdx<G.waveMax) { toast('まだクリアしていません'); return; }
-    if (G.stageIdx<Stages.length-1) startStage(G.stageIdx+1);
-    else toast('全ステージクリア！');
-    applyTheme(G.stageIdx, G.waveIdx);
-    SFX.ui();
+    if (G.waveIdx<G.waveMax){ toast('まだクリアしていません'); return; }
+    if (G.stageIdx<Stages.length-1) startStage(G.stageIdx+1); else toast('全ステージクリア！');
+    applyTheme(G.stageIdx, G.waveIdx); SFX.ui();
   });
   document.querySelectorAll(".placeBtn").forEach(b=>{
     bindPointer(b, ()=>{
-      const t=b.getAttribute("data-t");
-      G.building={type:t};
-      highlightSelShop(t);
-      toast(`${TowerSpec[t].name} を配置：マスをタップ`);
-      SFX.ui();
+      const t=b.getAttribute("data-t"); G.building={type:t}; highlightSelShop(t);
+      toast(`${TowerSpec[t].name} を配置：マスをタップ`); SFX.ui();
     });
   });
-  function highlightSelShop(t){
-    document.querySelectorAll("#shop .card").forEach(c=>{
-      if (c.getAttribute("data-tower")===t) c.classList.add("sel"); else c.classList.remove("sel");
-    });
-  }
+  function highlightSelShop(t){ document.querySelectorAll("#shop .card").forEach(c=>{ if (c.getAttribute("data-tower")===t) c.classList.add("sel"); else c.classList.remove("sel"); }); }
   function clearSelShop(){ document.querySelectorAll("#shop .card").forEach(c=>c.classList.remove("sel")); }
 
-  // ========= Audio初期化（最初のタップで） & ボタン =========
+  // ---------- Audio初期化（最初のタップで） ----------
   ['pointerdown','touchstart'].forEach(ev=>{
-    window.addEventListener(ev, ()=>{
-      try {
-        if (!AudioSys.ctx) ensureCtx();
-        resumeCtx();
-      } catch(e){}
-    }, { once:true, passive:true });
+    window.addEventListener(ev, ()=>{ try{ if(!AudioSys.ctx) ensureCtx(); resumeCtx(); }catch(e){} }, { once:true, passive:true });
   });
-  bindPointer(btnAudio, ()=>{
-    setAudioOn(!AudioSys.on);
-    toast(AudioSys.on?'音：ON':'音：OFF');
-  });
-  bindPointer(btnBGM, ()=>{
-    if (!AudioSys.on) setAudioOn(true);
-    setBGMOn(!AudioSys.bgmOn);
-    toast(AudioSys.bgmOn?'BGM：ON':'BGM：OFF');
-  });
+  bindPointer(btnAudio, ()=>{ setAudioOn(!AudioSys.on); toast(AudioSys.on?'音：ON':'音：OFF'); });
+  bindPointer(btnBGM, ()=>{ if(!AudioSys.on) setAudioOn(true); setBGMOn(!AudioSys.bgmOn); toast(AudioSys.bgmOn?'BGM：ON':'BGM：OFF'); });
   updateAudioButtons();
 
-  // ========= HUD更新 =========
-  function updateHUD(){
-    lifeEl.textContent=G.life;
-    goldEl.textContent=G.gold;
-    waveEl.textContent=G.waveIdx;
-    waveMaxEl.textContent=G.waveMax;
-    stageEl.textContent=G.stageIdx+1;
-    if (G.sel){
-      upCostEl.textContent = String(towerCostToUpgrade(G.sel));
-      sellAmtEl.textContent = String(towerSellPrice(G.sel));
-    }
-  }
+  // ---------- HUD/終了 ----------
+  function updateHUD(){ lifeEl.textContent=G.life; goldEl.textContent=G.gold; waveEl.textContent=G.waveIdx; waveMaxEl.textContent=G.waveMax; stageEl.textContent=G.stageIdx+1;
+    if (G.sel){ upCostEl.textContent=String(towerCostToUpgrade(G.sel)); sellAmtEl.textContent=String(towerSellPrice(G.sel)); } }
+  function gameOver(){ G.paused=true; toast("ゲームオーバー！"); SFX.gameover(); }
 
-  // ========= ゲームオーバー =========
-  function gameOver(){
-    G.paused=true; toast("ゲームオーバー！");
-    SFX.gameover();
+  // ---------- 起動 ----------
+  function boot(){
+    fit();
+    const prog=loadProgress(); const startIdx=prog ? Math.min(Stages.length-1, prog.stageIdx) : 0;
+    startStage(startIdx);
+    requestAnimationFrame(loop);
   }
-
-  // ========= 起動 =========
   window.addEventListener("resize", fit);
-  fit();
-
-  const prog = loadProgress();
-  const startIdx = prog ? Math.min(Stages.length-1, prog.stageIdx) : 0;
-  startStage(startIdx);
-
-  requestAnimationFrame(loop);
+  window.addEventListener("load", boot);
 })();
 </script>
 </body>

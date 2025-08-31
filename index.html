@@ -3,14 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>Road Guardians 10 (Straight & Centered)</title>
+<title>Road Guardians 10 (Straight & Centered, Fixed)</title>
 <style>
-  :root{--bg:#0f1320;--panel:#151b28;--accent:#4cc9f0;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444;}
-  html,body{
-    margin:0;background:var(--bg);color:#eef;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
-    padding-bottom:env(safe-area-inset-bottom);
-  }
-  /* タイトル */
+  :root{--bg:#0f1320;--panel:#151b28;--accent:#4cc9f0;--ok:#22c55e;}
+  html,body{margin:0;background:var(--bg);color:#eef;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
+    padding-bottom:env(safe-area-inset-bottom);}
   #title{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
     background:radial-gradient(84% 70% at 50% 30%, #17203a 0%, #0e1322 60%, #0a0f1c 100%);z-index:999;}
   .tbox{width:min(820px,94vw);text-align:center;padding:28px 18px}
@@ -22,16 +19,11 @@
   .btn.ok{border-color:#1b6e3c;background:#12492b}
   .btn.alt{border-color:#3a455a;background:#101725}
   .blink{animation:blink 1s infinite}@keyframes blink{0%{filter:brightness(1)}50%{filter:brightness(1.6)}100%{filter:brightness(1)}}
-
-  /* ゲームUI */
   #game{display:none}
   #hud{display:flex;gap:8px;align-items:center;justify-content:center;padding:8px;background:var(--panel);position:sticky;top:0;z-index:2;flex-wrap:wrap}
   .pill{padding:6px 10px;border-radius:999px;background:#1e2538;font-weight:600}
   #wrap{display:flex;flex-direction:column;gap:8px;align-items:center}
-  canvas{
-    background:#0f1724;border-radius:10px;touch-action:none;
-    box-shadow:0 0 0 1px #203046 inset; /* 見た目の枠。borderは使わない＝ズレ防止 */
-  }
+  canvas{background:#0f1724;border-radius:10px;touch-action:none;box-shadow:0 0 0 1px #203046 inset;}
   #shop{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:8px;width:min(720px,96vw)}
   .card{background:#172033;border:1px solid #24344b;border-radius:12px;padding:10px}
   .card h4{margin:.2rem 0 .4rem 0}
@@ -91,8 +83,8 @@
       </div>
 
       <div id="bottom">
-        <button id="btnUpgrade" class="btn warn">⬆ 強化（💵<span id="upCost">-</span>）</button>
-        <button id="btnSell" class="btn bad">🗑 売却（💰<span id="sellAmt">-</span>）</button>
+        <button id="btnUpgrade" class="btn">⬆ 強化（💵<span id="upCost">-</span>）</button>
+        <button id="btnSell" class="btn">🗑 売却（💰<span id="sellAmt">-</span>）</button>
         <button id="btnNextStage" class="btn ok">🏁 ステージクリア → 次へ</button>
       </div>
     </div>
@@ -113,11 +105,10 @@
   var DPR=Math.max(1,Math.min(2,window.devicePixelRatio||1));
   var COLS=24, ROWS=15, TILE=40;
 
-  // ★ 比率を ROWS/COLS (= 15/24 = 0.625) に固定して中央化
+  // 比率を ROWS/COLS (=15/24=0.625) に固定して中央化
   function fit(){
     var maxW = Math.min(960, window.innerWidth * 0.96);
-    var w = maxW;
-    var h = w * (ROWS / COLS);  // ← 正しい比率で高さを決定（中央に来る）
+    var w = maxW, h = w * (ROWS / COLS);
     cv.style.width  = w + "px";
     cv.style.height = h + "px";
     cv.width  = (w * DPR) | 0;
@@ -130,14 +121,14 @@
   var toastEl=$("#toast"), toastTimer=null;
   function toast(s){clearTimeout(toastTimer);toastEl.textContent=s;toastEl.style.opacity=1;toastTimer=setTimeout(function(){toastEl.style.opacity=0;},1400);}
 
-  /* ===== Audio ===== */
+  /* ===== Audio（SFX/BGM） ===== */
   var AudioSys={ctx:null,master:null,sfx:null,bgm:null,on:false,bgmOn:false,bpm:86,tickMS:0,timer:null,step:0,theme:'calm',density:1};
   function ensureCtx(){if(AudioSys.ctx)return;var Ctx=window.AudioContext||window.webkitAudioContext;var ctx=new Ctx();
     var master=ctx.createGain();master.gain.value=0.9;master.connect(ctx.destination);
     var sfx=ctx.createGain();sfx.gain.value=0.9;sfx.connect(master);
     var bgm=ctx.createGain();bgm.gain.value=0.28;bgm.connect(master);
     AudioSys.ctx=ctx;AudioSys.master=master;AudioSys.sfx=sfx;AudioSys.bgm=bgm;}
-  function resumeCtx(){if(AudioSys.ctx && AudioSys.ctx.state!=="running") AudioSys.ctx.resume();}
+  function resumeCtx(){if(AudioSys.ctx&&AudioSys.ctx.state!=="running")AudioSys.ctx.resume();}
   function setAudioOn(v){ensureCtx();resumeCtx();AudioSys.on=v;AudioSys.master.gain.value=v?0.9:0;updateAudioButtons();}
   function setBGMOn(v){ensureCtx();resumeCtx();AudioSys.bgmOn=v;if(v)startBGM();else stopBGM();updateAudioButtons();}
   function updateAudioButtons(){$("#btnAudio").textContent=(AudioSys.on?"🔊 音 ON":"🔇 音 OFF");$("#btnBGM").textContent=(AudioSys.bgmOn?"♪ BGM ON":"♪ BGM OFF");}
@@ -147,8 +138,8 @@
     if(o.glide)osc.frequency.exponentialRampToValueAtTime(Math.max(80,(o.freq||440)*o.glide),t+(o.dur||0.12)*0.9);osc.start(t);osc.stop(t+(o.dur||0.12)+0.02);}
   function noiseBurst(o){o=o||{};if(!AudioSys.on||!AudioSys.ctx)return;var ctx=AudioSys.ctx,buf=ctx.createBuffer(1,ctx.sampleRate*(o.dur||0.18),ctx.sampleRate),data=buf.getChannelData(0);
     for(var i=0;i<data.length;i++)data[i]=Math.random()*2-1;var src=ctx.createBufferSource();src.buffer=buf;var f=ctx.createBiquadFilter();f.type="lowpass";f.frequency.value=o.lp||1200;
-    var g=ctx.createGain();g.gain.value=o.gain||0.28;src.connect(f);f.connect(g);g.connect(o.out==="bgm"?AudioSys.bgm:AudioSys.sfx);
-    var t=ctx.currentTime;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(g.gain.value,t+0.02);g.gain.exponentialRampToValueAtTime(0.0001,t+(o.dur||0.18));src.start(t);src.stop(t+(o.dur||0.18)+0.02);}
+    var g=ctx.createGain();g.gain.value=o.gain||0.28;src.connect(f);f.connect(g);g.connect(o.out==="bgm"?AudioSys.bgm:AudioSys.sfx);var t=ctx.currentTime;
+    g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(g.gain.value,t+0.02);g.gain.exponentialRampToValueAtTime(0.0001,t+(o.dur||0.18));src.start(t);src.stop(t+(o.dur||0.18)+0.02);}
   var SFX={ui:function(){oscBurst({freq:880,dur:0.08,type:"sine",gain:0.18});},place:function(){oscBurst({freq:540,dur:0.09,type:"triangle",gain:0.22});},
     upgrade:function(){oscBurst({freq:640,dur:0.12,type:"triangle",gain:0.22});oscBurst({freq:960,dur:0.12,type:"triangle",gain:0.18});},
     sell:function(){oscBurst({freq:360,dur:0.12,type:"sine",gain:0.18});},shotArcher:function(){oscBurst({freq:1100,dur:0.06,type:"square",gain:0.16,glide:0.6});},
@@ -175,7 +166,7 @@
   function applyTheme(stageIdx,waveIdx){var t=themeForStage(stageIdx);AudioSys.theme=t.name;var waveBoost=Math.min(12,Math.floor((waveIdx||0)/2)*2);
     AudioSys.bpm=t.bpm+waveBoost;AudioSys.density=t.density+(waveIdx>6?1:0);if(AudioSys.bgmOn&&AudioSys.on)startBGM();}
 
-  /* ===== 定数 ===== */
+  /* ===== ゲーム定数 ===== */
   var PATH=2, BUILD=1, BLOCK=0;
   var TowerSpec={archer:{name:"アーチャー",cost:60,range:3.6,rate:0.65,dmg:18,fly:true,aoe:0,slow:0,upScale:1.55},
                  cannon:{name:"キャノン",cost:80,range:3.2,rate:1.1,dmg:28,fly:false,aoe:1.2,slow:0,upScale:1.6},
@@ -215,7 +206,8 @@
   function loadProgress(){try{var r=localStorage.getItem(SAVE_KEY);return r?JSON.parse(r):null;}catch(e){return null;}}
 
   var lifeEl=$("#life"),goldEl=$("#gold"),waveEl=$("#wave"),waveMaxEl=$("#waveMax"),stageEl=$("#stage");
-  var btnStartWave=$("#btnStart"),btnPause=$("#btnPause"),btnSpeed=$("#btnSpeed"),btnUp=$("#btnUpgrade"),btnSell=$("#btnSell"),btnNext=$("#btnNextStage");
+  var btnStartWave=$("#btnStart"),btnPause=$("#btnPause"),btnSpeed=$("#btnSpeed"),
+      btnUp=$("#btnUpgrade"),btnSell=$("#btnSell"),btnNext=$("#btnNextStage");
   var upCostEl=$("#upCost"),sellAmtEl=$("#sellAmt"); var btnAudio=$("#btnAudio"),btnBGM=$("#btnBGM");
 
   function updateHUD(){lifeEl.textContent=G.life;goldEl.textContent=G.gold;waveEl.textContent=G.waveIdx;waveMaxEl.textContent=G.waveMax;stageEl.textContent=G.stageIdx+1;
@@ -297,26 +289,20 @@
     ctx.save(); ctx.scale(DPR,DPR);
     var W=cv.width/DPR, H=cv.height/DPR; ctx.clearRect(0,0,W,H);
 
-    // タイル
     for(var y=0;y<ROWS;y++){ for(var x=0;x<COLS;x++){
       var v=(G.grid&&G.grid[y])?G.grid[y][x]:BUILD, px=x*TILE, py=y*TILE;
       ctx.fillStyle=(v===PATH)?"#34547a":(v===BUILD?"#121d2c":"#0b1422");
       ctx.fillRect(px,py,TILE,TILE);
     }}
-
-    // ルート線（中央直線）
     ctx.strokeStyle="rgba(110,231,183,.85)"; ctx.lineWidth=3; ctx.beginPath();
     ctx.moveTo((1.5)*TILE,(7.5)*TILE); ctx.lineTo((23.5)*TILE,(7.5)*TILE); ctx.stroke();
-    // ピン
     ctx.fillStyle="#22c55e"; ctx.beginPath(); ctx.arc((1.5)*TILE,(7.5)*TILE,8,0,Math.PI*2); ctx.fill();
     ctx.fillStyle="#ef4444"; ctx.beginPath(); ctx.arc((23.5)*TILE,(7.5)*TILE,8,0,Math.PI*2); ctx.fill();
 
-    // グリッド
     ctx.fillStyle="rgba(255,255,255,.03)";
     for(var gy=0;gy<=ROWS;gy++) ctx.fillRect(0, gy*TILE, COLS*TILE, 1);
     for(var gx=0;gx<=COLS;gx++) ctx.fillRect(gx*TILE, 0, 1, ROWS*TILE);
 
-    // タワー
     for(var tI=0;tI<G.towers.length;tI++){
       var t=G.towers[tI], cx=(t.cx+0.5)*TILE, cy=(t.cy+0.5)*TILE;
       if(G.sel===t){ ctx.beginPath(); ctx.arc(cx,cy,t.range*TILE,0,Math.PI*2); ctx.strokeStyle="rgba(76,201,240,.35)"; ctx.lineWidth=2; ctx.stroke(); }
@@ -325,7 +311,6 @@
       ctx.fillStyle="#fff"; ctx.font="600 12px system-ui"; ctx.textAlign="center"; ctx.fillText(String(t.lv),cx,cy+4);
     }
 
-    // 敵
     for(var eI=0;eI<G.enemies.length;eI++){
       var e=G.enemies[eI]; if(e.dead) continue; var x=e.x*TILE, y=e.y*TILE;
       ctx.fillStyle="rgba(0,0,0,.3)"; ctx.beginPath(); ctx.ellipse(x,y+7,12,6,0,0,Math.PI*2); ctx.fill();
@@ -334,13 +319,11 @@
       if(e.slow>0){ ctx.fillStyle="#60a5fa"; ctx.fillRect(x-w/2,y-28, w*(e.slow), 3); }
     }
 
-    // 弾
     for(var bI=0;bI<G.bullets.length;bI++){
       var b=G.bullets[bI], bx=b.x*TILE, by=b.y*TILE; ctx.fillStyle=b.aoe>0?"#fde047":"#fca5a5";
       if(b.aoe>0){ ctx.beginPath(); ctx.arc(bx,by,7,0,Math.PI*2); ctx.fill(); } else { ctx.fillRect(bx-4,by-4,8,8); }
     }
 
-    // 建設プレビュー
     if(G.building && hoverCell && hoverCell.cx>=0){
       var ok=canBuildAt(hoverCell.cx,hoverCell.cy);
       ctx.strokeStyle=ok?"rgba(76,201,240,.9)":"rgba(239,68,68,.9)";
@@ -369,34 +352,33 @@
   cv.addEventListener('mousedown', function(e){ onCanvasTap(e); });
   function selectTowerAt(cx,cy){ var i; G.sel=null; for(i=0;i<G.towers.length;i++){ var t=G.towers[i]; if(t.cx===cx&&t.cy===cy){ G.sel=t; break; } } updateHUD(); }
 
-  /* ===== UIボタン ===== */
-  function bind(el,fn){ el.addEventListener('pointerdown',function(e){e.preventDefault();fn();});
-    el.addEventListener('touchstart',function(){fn();},{passive:true}); el.addEventListener('mousedown',function(){fn();}); }
-  bind(btnStartWave,function(){startWave();SFX.ui();});
-  bind(btnPause,function(){G.paused=!G.paused;btnPause.textContent=G.paused?'▶':'⏸';SFX.ui();toast(G.paused?'一時停止':'再開');});
-  bind(btnSpeed,function(){G.speed=(G.speed===1?2:1);btnSpeed.textContent='⏩ ×'+G.speed;SFX.ui();toast('速度×'+G.speed);});
-  bind(btnUp,function(){upgradeSel();}); bind(btnSell(function(){sellSel();}));
-  function bind(btn){return btn;} // (lint用ダミー)
-
-  // 売却ボタンの実バインド（上の行は linter 回避用）
-  document.getElementById('btnSell').addEventListener('click', sellSel);
-  document.getElementById('btnUpgrade').addEventListener('click', upgradeSel);
-
-  document.getElementById('btnNextStage').addEventListener('click', function(){
+  /* ===== UIボタン（安全なバインド関数） ===== */
+  function bindClick(el, fn){
+    el.addEventListener('click', fn);
+    el.addEventListener('pointerdown', function(e){ e.preventDefault(); });
+    el.addEventListener('touchstart', function(){}, {passive:true});
+  }
+  bindClick(btnStartWave, function(){ startWave(); SFX.ui(); });
+  bindClick(btnPause, function(){ G.paused=!G.paused; btnPause.textContent=G.paused?'▶':'⏸'; SFX.ui(); toast(G.paused?'一時停止':'再開'); });
+  bindClick(btnSpeed, function(){ G.speed=(G.speed===1?2:1); btnSpeed.textContent='⏩ ×'+G.speed; SFX.ui(); toast('速度×'+G.speed); });
+  bindClick(btnUp, upgradeSel);
+  bindClick(btnSell, sellSel);
+  bindClick(btnNext, function(){
     if(G.waveIdx<G.waveMax){ toast('まだクリアしていません'); return; }
     if(G.stageIdx<Stages.length-1) startStage(G.stageIdx+1); else toast('全ステージクリア！');
     applyTheme(G.stageIdx,G.waveIdx); SFX.ui();
   });
-
   var placeBtns=document.querySelectorAll(".placeBtn");
-  for(var pi=0;pi<placeBtns.length;pi++){
+  for(var i=0;i<placeBtns.length;i++){
     (function(btn){
-      btn.addEventListener('click', function(){
+      bindClick(btn, function(){
         var t=btn.getAttribute("data-t");
-        G.building={type:t}; highlightSelShop(t);
-        toast(TowerSpec[t].name+" を配置：マスをタップ"); SFX.ui();
+        G.building={type:t};
+        highlightSelShop(t);
+        toast(TowerSpec[t].name+" を配置：マスをタップ");
+        SFX.ui();
       });
-    })(placeBtns[pi]);
+    })(placeBtns[i]);
   }
   function highlightSelShop(t){var cards=document.querySelectorAll("#shop .card"),i;for(i=0;i<cards.length;i++){var c=cards[i];if(c.getAttribute("data-tower")===t)c.classList.add("sel");else c.classList.remove("sel");}}
   function clearSelShop(){var cards=document.querySelectorAll("#shop .card"),i;for(i=0;i<cards.length;i++)cards[i].classList.remove("sel");}
@@ -420,8 +402,8 @@
   window.addEventListener("load",function(){fit(); render();});
 
   // サウンドトグル
-  document.getElementById('btnAudio').addEventListener('click',function(){ setAudioOn(!AudioSys.on); toast(AudioSys.on?'音：ON':'音：OFF');});
-  document.getElementById('btnBGM').addEventListener('click',function(){ if(!AudioSys.on) setAudioOn(true); setBGMOn(!AudioSys.bgmOn); toast(AudioSys.bgmOn?'BGM：ON':'BGM：OFF');});
+  bindClick(btnAudio,function(){ setAudioOn(!AudioSys.on); toast(AudioSys.on?'音：ON':'音：OFF'); });
+  bindClick(btnBGM,function(){ if(!AudioSys.on) setAudioOn(true); setBGMOn(!AudioSys.bgmOn); toast(AudioSys.bgmOn?'BGM：ON':'BGM：OFF'); });
   updateAudioButtons();
 })();
 </script>

@@ -2,419 +2,353 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>Road Guardians 10 — Pixel-Perfect</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Road Guardians: Tap Strike</title>
 <style>
-  :root{--bg:#0f1320;--panel:#151b28;--accent:#4cc9f0;--ok:#22c55e;}
-  html,body{margin:0;background:var(--bg);color:#eef;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
-    padding-bottom:env(safe-area-inset-bottom);}
-  /* タイトル */
+  :root{--bg:#0e1320;--panel:#151b28;--accent:#4cc9f0;--ok:#22c55e;--warn:#f59e0b}
+  html,body{margin:0;background:var(--bg);color:#eef;font-family:system-ui,-apple-system,Segoe UI,Roboto}
   #title{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
-    background:radial-gradient(84% 70% at 50% 30%, #17203a 0%, #0e1322 60%, #0a0f1c 100%);z-index:999}
-  .tbox{width:min(820px,94vw);text-align:center;padding:28px 18px}
-  .logo{font-size:clamp(32px,5.6vw,64px);font-weight:900;margin:0 0 10px;
-    background:linear-gradient(180deg,#e2e8f0 0%,#bcd7ff 40%,#7bc6ff 80%);-webkit-background-clip:text;background-clip:text;color:transparent}
-  .subtitle{opacity:.9;margin:0 0 22px}
-  .startRow{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:14px}
-  .btn{padding:12px 16px;border:1px solid #2a3446;border-radius:12px;background:#1a2333;color:#eef;font-weight:800;touch-action:manipulation}
-  .btn.ok{border-color:#1b6e3c;background:#12492b}
-  .btn.alt{border-color:#3a455a;background:#101725}
-  .blink{animation:blink 1s infinite}@keyframes blink{0%{filter:brightness(1)}50%{filter:brightness(1.6)}100%{filter:brightness(1)}}
-
-  /* ゲームUI */
-  #game{display:none}
-  #hud{display:flex;gap:8px;align-items:center;justify-content:center;padding:8px;background:var(--panel);position:sticky;top:0;z-index:2;flex-wrap:wrap}
-  .pill{padding:6px 10px;border-radius:999px;background:#1e2538;font-weight:600}
+    background:radial-gradient(80% 65% at 50% 30%,#17203a 0%,#0e1322 60%,#0a0f1c 100%);z-index:99}
+  .tbox{width:min(800px,94vw);text-align:center;padding:24px}
+  .logo{font-size:clamp(32px,6vw,60px);font-weight:900;margin:0 0 6px;background:linear-gradient(180deg,#e2e8f0,#bcd7ff 45%,#7bc6ff 80%);-webkit-background-clip:text;color:transparent}
+  .sub{opacity:.9;margin:0 0 14px}
+  .btn{padding:12px 16px;border:1px solid #2a3446;border-radius:12px;background:#1a2333;color:#eef;font-weight:800}
+  .ok{background:#12492b;border-color:#1b6e3c}
+  #hud{display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;padding:8px;background:#11182a;position:sticky;top:0;z-index:2}
+  .pill{padding:6px 10px;border-radius:999px;background:#1c2438;font-weight:700}
   #wrap{display:flex;flex-direction:column;gap:8px;align-items:center}
-  canvas{background:#0f1724;border-radius:10px;touch-action:none;box-shadow:0 0 0 1px #203046 inset;}
-  #shop{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:8px;width:min(720px,96vw)}
-  .card{background:#172033;border:1px solid #24344b;border-radius:12px;padding:10px}
-  .card h4{margin:.2rem 0 .4rem 0}
-  .row{display:flex;gap:8px;align-items:center;justify-content:space-between}
-  .small{opacity:.85;font-size:.9rem}
-  #bottom{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:8px;width:min(720px,96vw)}
-  #toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#1b2433;border:1px solid #2b3a52;color:#fff;padding:10px 14px;border-radius:10px;opacity:0;transition:.3s;pointer-events:none;z-index:3}
-  .sel{outline:2px solid var(--accent)}
-  #err{display:none;position:fixed;left:8px;right:8px;bottom:8px;background:#1b2433;color:#fff;border:1px solid #2b3a52;padding:10px;border-radius:10px;z-index:99999;font-family:ui-monospace,monospace;white-space:pre-wrap;max-height:45vh;overflow:auto}
+  canvas{background:#0f1724;border-radius:12px;touch-action:none;box-shadow:0 0 0 1px #213048 inset}
+  #shop{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:min(720px,96vw);padding:8px}
+  .card{background:#162033;border:1px solid #253447;border-radius:12px;padding:10px}
+  .row{display:flex;justify-content:space-between;align-items:center}
+  #toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#1b2434;border:1px solid #2b3a52;padding:8px 12px;border-radius:10px;opacity:0;transition:.25s;pointer-events:none}
+  #err{display:none;position:fixed;left:8px;right:8px;bottom:8px;background:#1b2433;border:1px solid #2b3a52;padding:10px;border-radius:10px;white-space:pre-wrap;font-family:ui-monospace,monospace;max-height:40vh;overflow:auto}
+  .hint{font-size:14px;opacity:.9;margin-top:8px}
 </style>
 </head>
 <body>
-  <!-- タイトル -->
-  <div id="title">
-    <div class="tbox">
-      <h1 class="logo">Road Guardians 10</h1>
-      <p class="subtitle">スマホ向け 本格タワーディフェンス（全10ステージ／直線ルート）</p>
-      <div class="startRow">
-        <button id="btnStartSound" class="btn ok">▶ サウンド ON で開始</button>
-        <button id="btnStartMute" class="btn alt">▶ ミュートで開始</button>
-      </div>
-      <p class="small" style="margin-top:10px">BGMは序盤のどか → 中盤冒険 → 終盤勇ましいに自動で変化</p>
+<!-- タイトル -->
+<div id="title">
+  <div class="tbox">
+    <h1 class="logo">Road Guardians: Tap Strike</h1>
+    <p class="sub">3レーンをタップして撃つ！当ててコイン→その場で強化。全10ステージ。</p>
+    <p class="hint">遊び方：<b>レーンをタップ</b>→ショット／<b>強化</b>で連射＆火力UP／敵が左へ到達でライフ-1</p>
+    <div style="display:flex;gap:10px;justify-content:center;margin-top:8px">
+      <button id="startSound" class="btn ok">▶ サウンドONでスタート</button>
+      <button id="startMute" class="btn">▶ ミュートでスタート</button>
     </div>
   </div>
+</div>
 
-  <!-- ゲーム本体 -->
-  <div id="game">
-    <div id="hud">
-      <span class="pill">❤️ <b id="life">20</b></span>
-      <span class="pill">💰 <b id="gold">100</b></span>
-      <span class="pill">🗡️ Wave <b id="wave">0</b>/<b id="waveMax">0</b></span>
-      <span class="pill">📍 Stage <b id="stage">1</b>/10</span>
-      <button id="btnStart" class="btn ok">▶ 次ウェーブ</button>
-      <button id="btnSpeed" class="btn">⏩ ×1</button>
-      <button id="btnPause" class="btn">⏸</button>
-      <button id="btnAudio" class="btn">🔇 音 OFF</button>
-      <button id="btnBGM" class="btn">♪ BGM OFF</button>
-    </div>
+<!-- 本体 -->
+<div id="game" style="display:none">
+  <div id="hud">
+    <span class="pill">❤️ <b id="life">10</b></span>
+    <span class="pill">💰 <b id="gold">0</b></span>
+    <span class="pill">📍 Stage <b id="stage">1</b>/10</span>
+    <span class="pill">🗡️ Wave <b id="wave">0</b>/<b id="wavemax">0</b></span>
+    <button id="pause" class="btn">⏸</button>
+    <button id="speed" class="btn">⏩ ×1</button>
+    <button id="bgm" class="btn">♪ BGM OFF</button>
+  </div>
 
-    <div id="wrap">
-      <canvas id="cv"></canvas>
+  <div id="wrap">
+    <canvas id="cv"></canvas>
 
-      <div id="shop">
-        <div class="card" data-tower="archer">
-          <h4>アーチャー</h4><div class="small">単体高DPS / 飛行可</div>
-          <div class="row"><span>💵 60</span><button class="btn ok placeBtn" data-t="archer">設置</button></div>
-        </div>
-        <div class="card" data-tower="cannon">
-          <h4>キャノン</h4><div class="small">範囲攻撃 / 飛行不可</div>
-          <div class="row"><span>💵 80</span><button class="btn ok placeBtn" data-t="cannon">設置</button></div>
-        </div>
-        <div class="card" data-tower="ice">
-          <h4>アイス</h4><div class="small">鈍足付与 / 補助</div>
-          <div class="row"><span>💵 70</span><button class="btn ok placeBtn" data-t="ice">設置</button></div>
-        </div>
+    <div id="shop">
+      <div class="card">
+        <div class="row"><b>攻撃力</b><button id="upPow" class="btn ok">強化（💵<span id="powC">30</span>）</button></div>
+        <div class="hint">1発のダメージUP</div>
       </div>
-
-      <div id="bottom">
-        <button id="btnUpgrade" class="btn">⬆ 強化（💵<span id="upCost">-</span>）</button>
-        <button id="btnSell" class="btn">🗑 売却（💰<span id="sellAmt">-</span>）</button>
-        <button id="btnNextStage" class="btn ok">🏁 ステージクリア → 次へ</button>
+      <div class="card">
+        <div class="row"><b>連射</b><button id="upRate" class="btn ok">強化（💵<span id="rateC">30</span>）</button></div>
+        <div class="hint">クールダウン短縮</div>
+      </div>
+      <div class="card">
+        <div class="row"><b>オート</b><button id="toggleAuto" class="btn">OFF</button></div>
+        <div class="hint">次の敵を自動で狙撃</div>
       </div>
     </div>
   </div>
+</div>
 
-  <div id="toast"></div>
-  <div id="err"></div>
+<div id="toast"></div>
+<div id="err"></div>
 
 <script>
-(function(){
-  /* ===== エラー可視化 ===== */
-  var errBox=document.getElementById('err');
-  window.addEventListener('error',e=>{errBox.style.display='block';errBox.textContent='JS Error: '+(e.message||e.error);});
+(()=>{
+// ===== エラー表示 =====
+const errEl=document.getElementById('err');
+window.addEventListener('error',e=>{errEl.style.display='block';errEl.textContent='JS Error: '+(e.message||e.error);});
 
-  /* ===== DOM / Canvas ===== */
-  const $=s=>document.querySelector(s);
-  const cv=$("#cv"), ctx=cv.getContext("2d");
-  const DPR=Math.max(1,Math.min(2,window.devicePixelRatio||1));
-  const COLS=24, ROWS=15;
-  let TILE=40; // 1タイルの実ピクセル（canvas座標）
+// ===== DOM =====
+const $=s=>document.querySelector(s);
+const cv=$("#cv"), ctx=cv.getContext('2d');
+const lifeEl=$("#life"), goldEl=$("#gold"), stageEl=$("#stage"), waveEl=$("#wave"), wmaxEl=$("#wavemax");
+const startSound=$("#startSound"), startMute=$("#startMute"), title=$("#title"), game=$("#game");
+const pauseBtn=$("#pause"), speedBtn=$("#speed"), bgmBtn=$("#bgm");
+const upPow=$("#upPow"), upRate=$("#upRate"), powC=$("#powC"), rateC=$("#rateC"), autoBtn=$("#toggleAuto");
+const toastEl=$("#toast");
 
-  // ★ 画面に合わせてタイル整数で拡縮 → キャンバスはタイル数ピッタリの大きさに
-  function fit(){
-    const maxCssW = Math.min(960, window.innerWidth * 0.96);
-    const maxCssH = Math.min(520, window.innerHeight * 0.46); // HUD/ショップ分を考慮して控えめ
-    const maxPxW = Math.floor(maxCssW * DPR);
-    const maxPxH = Math.floor(maxCssH * DPR);
+// ===== サイズ（ピクセルパーフェクト） =====
+const DPR=Math.max(1,Math.min(2,window.devicePixelRatio||1));
+const COLS=12, ROWS=8; // プレイ領域（中央に3レーンを引く）
+let TILE=40;
+function fit(){
+  const maxCssW=Math.min(960,window.innerWidth*0.96);
+  const maxCssH=Math.min(560,window.innerHeight*0.5);
+  const maxPxW=Math.floor(maxCssW*DPR), maxPxH=Math.floor(maxCssH*DPR);
+  TILE=Math.max(8, Math.min(Math.floor(maxPxW/COLS), Math.floor(maxPxH/ROWS)));
+  const w=TILE*COLS, h=TILE*ROWS;
+  cv.width=w; cv.height=h; cv.style.width=(w/DPR)+'px'; cv.style.height=(h/DPR)+'px';
+}
+window.addEventListener('resize',fit);
 
-    // どちらの制約でも割り切れる最大片タイル
-    const tileByW = Math.max(8, Math.floor(maxPxW / COLS));
-    const tileByH = Math.max(8, Math.floor(maxPxH / ROWS));
-    TILE = Math.max(8, Math.min(tileByW, tileByH));   // 8px以上で見切れないように
+// ===== サウンド =====
+const AudioSys={ctx:null,master:null,sfx:null,bgm:null,on:false,bgmOn:false,bpm:96,timer:null,step:0,theme:0};
+function ensureCtx(){if(AudioSys.ctx)return;const AC=window.AudioContext||window.webkitAudioContext;const ctx=new AC();
+  const master=ctx.createGain();master.gain.value=0.9;master.connect(ctx.destination);
+  const sfx=ctx.createGain();sfx.gain.value=0.9;sfx.connect(master);
+  const bgm=ctx.createGain();bgm.gain.value=0.24;bgm.connect(master);
+  AudioSys.ctx=ctx;AudioSys.master=master;AudioSys.sfx=sfx;AudioSys.bgm=bgm;}
+function resumeCtx(){if(AudioSys.ctx&&AudioSys.ctx.state!=='running')AudioSys.ctx.resume();}
+function setAudio(v){ensureCtx();resumeCtx();AudioSys.on=v;AudioSys.master.gain.value=v?0.9:0;bgmBtn.textContent=AudioSys.bgmOn?'♪ BGM ON':'♪ BGM OFF';}
+function setBGM(v){ensureCtx();resumeCtx();AudioSys.bgmOn=v;if(v)startBGM();else stopBGM();bgmBtn.textContent=v?'♪ BGM ON':'♪ BGM OFF';}
+function osc(o){if(!AudioSys.on||!AudioSys.ctx)return;const ctx=AudioSys.ctx,osc=ctx.createOscillator(),g=ctx.createGain();
+  osc.type=o.type||'sine';osc.frequency.value=o.f||440;osc.connect(g);g.connect(o.out==='bgm'?AudioSys.bgm:AudioSys.sfx);
+  const t=ctx.currentTime;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(o.g||0.25,t+0.01);g.gain.exponentialRampToValueAtTime(0.0001,t+(o.d||0.12));
+  if(o.glide)osc.frequency.exponentialRampToValueAtTime(Math.max(80,(o.f||440)*o.glide),t+(o.d||0.12)*0.9);osc.start(t);osc.stop(t+(o.d||0.12)+0.02);}
+function noise(o){if(!AudioSys.on||!AudioSys.ctx)return;const ctx=AudioSys.ctx,buf=ctx.createBuffer(1,ctx.sampleRate*(o.d||0.18),ctx.sampleRate),d=buf.getChannelData(0);
+  for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;const src=ctx.createBufferSource();src.buffer=buf; const f=ctx.createBiquadFilter();f.type='lowpass';f.frequency.value=o.lp||1200;
+  const g=ctx.createGain();g.gain.value=o.g||0.28;src.connect(f);f.connect(g);g.connect(o.out==='bgm'?AudioSys.bgm:AudioSys.sfx);
+  const t=ctx.currentTime;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(g.gain.value,t+0.02);g.gain.exponentialRampToValueAtTime(0.0001,t+(o.d||0.18));
+  src.start(t);src.stop(t+(o.d||0.18)+0.02);}
+const SFX={tap:()=>osc({f:1000,d:0.06,type:'square',g:0.16}),
+           hit:()=>osc({f:420,d:0.06,type:'square',g:0.13}),
+           kill:()=>{osc({f:800,d:0.08,type:'triangle',g:0.2});osc({f:1200,d:0.07,type:'triangle',g:0.16});},
+           dmg:()=>osc({f:280,d:0.12,type:'sine',g:0.22,glide:0.6}),
+           coin:()=>{osc({f:1200,d:0.08,g:0.22});osc({f:1600,d:0.08,g:0.18});},
+           start:()=>{osc({f:600,d:0.12,type:'triangle',g:0.2});osc({f:900,d:0.12,type:'triangle',g:0.18});}};
+function startBGM(){stopBGM();if(!AudioSys.on)return;const tick=(60000/AudioSys.bpm)/4;AudioSys.step=0;
+  AudioSys.timer=setInterval(()=>{if(!AudioSys.bgmOn||!AudioSys.on)return;const s=AudioSys.step%16,bar=Math.floor(AudioSys.step/16)%8;
+    const chords=[[261.63,329.63,392],[220,261.63,329.63],[174.61,220,261.63],[196,246.94,293.66],
+                  [293.66,349.23,440],[233.08,277.18,349.23],[261.63,329.63,392],[329.63,392,493.88]];
+    const ch=chords[bar], dens=1+AudioSys.theme;
+    if(s%8===0) noise({d:0.08,lp:400,g:0.14+0.03*dens,out:'bgm'});
+    if(s%2===0) noise({d:0.04,lp:6000,g:0.06+0.02*dens,out:'bgm'});
+    if(s%4===0) {osc({f:ch[0],d:0.12,type:'triangle',g:0.08+0.01*dens,out:'bgm'});osc({f:ch[1],d:0.12,type:'triangle',g:0.07+0.01*dens,out:'bgm'});osc({f:ch[2],d:0.12,type:'triangle',g:0.07+0.01*dens,out:'bgm'});}
+    if(s===0||s===8) osc({f:ch[0]/2,d:0.16,type:'sawtooth',g:0.10+0.02*dens,glide:0.9,out:'bgm'});
+    AudioSys.step++;},tick);}
+function stopBGM(){if(AudioSys.timer){clearInterval(AudioSys.timer);AudioSys.timer=null;}}
 
-    // 実ピクセルはタイル数 * タイルサイズ（割り切り）
-    const wpx = TILE * COLS;
-    const hpx = TILE * ROWS;
+// ===== ゲームデータ =====
+const LANES=[2,4,6]; // y(行)
+const ENEMY={grunt:{hp:40, spd:0.9, gold:6, color:'#67e8f9'},
+             fast :{hp:28, spd:1.5, gold:7, color:'#f59e0b'},
+             tank :{hp:100,spd:0.6, gold:12,color:'#86efac'},
+             bat  :{hp:30, spd:1.2, gold:8, color:'#c084fc'}};
+const Waves=[
+  ["grunt,8"],["grunt,10"],["fast,8"],["grunt,10|fast,6"],["tank,5"],["bat,10"],["grunt,8|tank,6"],["fast,10|bat,8"],["tank,8"],["tank,1|fast,12|bat,12"]
+];
+const StageHP=[10,10,10,9,9,8,8,7,7,6];
+const StageGold=[40,60,80,90,110,130,150,170,190,220];
 
-    // キャンバス内部サイズ（デバイスピクセル）
-    cv.width  = wpx;
-    cv.height = hpx;
+const G={life:10,gold:0,stage:0,wave:0,wavemax:0,paused:false,speed:1,auto:false,
+         pow:10, rate:0.35, powCost:30, rateCost:30, cd:0,
+         enemies:[], shots:[], t:0};
 
-    // 見た目サイズは CSS ピクセルへスケールダウン
-    cv.style.width  = (wpx / DPR) + "px";
-    cv.style.height = (hpx / DPR) + "px";
+// ===== 便利 =====
+function toast(s){clearTimeout(toast._t);toastEl.textContent=s;toastEl.style.opacity=1;toast._t=setTimeout(()=>toastEl.style.opacity=0,1200);}
+function rand(a,b){return a+Math.random()*(b-a);}
+function parsePack(str){return str.split("|").map(p=>{const [t,n]=p.split(",");return {type:t.trim(), n:parseInt(n||"1",10)};});}
+
+// ===== スタート/進行 =====
+function startStage(i){
+  G.stage=i; G.wave=0; G.wavemax=Waves.length; G.enemies=[]; G.shots=[];
+  G.life=StageHP[i]; G.gold=StageGold[i]; G.pow=10; G.rate=0.35; G.powCost=30; G.rateCost=30; G.cd=0;
+  updateHUD(); fit(); draw();
+  toast(`Stage ${i+1}`); AudioSys.theme = (i<3?0: i<7?1:2); AudioSys.bpm = 90 + i*2;
+}
+function startWave(){
+  if(G.wave>=G.wavemax)return;
+  const pack=parsePack(Waves[G.wave]); // キュー作成
+  const queue=[];
+  for(const p of pack){for(let i=0;i<p.n;i++) queue.push(p.type);}
+  // 一定間隔でレーンに出す
+  let k=0;
+  const spawner=setInterval(()=>{
+    if(G.paused) return;
+    if(k>=queue.length){clearInterval(spawner);return;}
+    const type=queue[k++]; spawn(type);
+  }, Math.max(280 - G.stage*10, 160));
+}
+function spawn(type){
+  const spec=ENEMY[type]||ENEMY.grunt;
+  const lane=LANES[Math.floor(Math.random()*LANES.length)];
+  G.enemies.push({type,x:COLS-1+0.2,y:lane+0.5,hp:spec.hp,hpMax:spec.hp,spd:spec.spd,gold:spec.gold,color:spec.color,alive:true});
+}
+
+// ===== 入力：タップでそのレーンにショット =====
+function cellFromEvent(ev){
+  const r=cv.getBoundingClientRect();
+  const x=((ev.touches?ev.touches[0].clientX:ev.clientX)-r.left)*(cv.width/r.width);
+  const y=((ev.touches?ev.touches[0].clientY:ev.clientY)-r.top)*(cv.height/r.height);
+  return {cx:Math.floor(x/TILE), cy:Math.floor(y/TILE)};
+}
+function fireToLane(yRow){
+  if(G.cd>0) return; // 連射制限
+  G.cd = G.rate;
+  G.shots.push({x:1.0,y:yRow+0.5,spd:8,dmg:G.pow});
+  SFX.tap();
+}
+cv.addEventListener('pointerdown',e=>{e.preventDefault();const c=cellFromEvent(e);
+  // 一番近いレーンにスナップ
+  let lane=LANES[0], best=1e9;
+  for(const L of LANES){const dy=Math.abs((L+0.5)- (c.cy+0.5)); if(dy<best){best=dy; lane=L;}}
+  fireToLane(lane);
+});
+cv.addEventListener('touchstart',e=>{const c=cellFromEvent(e); let lane=LANES[0],best=1e9;
+  for(const L of LANES){const dy=Math.abs((L+0.5)- (c.cy+0.5)); if(dy<best){best=dy; lane=L;}}
+  fireToLane(lane);
+},{passive:true});
+
+// ===== 強化 =====
+function tryBuy(cost){ if(G.gold<cost){toast('お金が足りない');return false;} G.gold-=cost; updateHUD(); return true; }
+upPow.addEventListener('click',()=>{ if(tryBuy(G.powCost)){ G.pow=Math.round(G.pow*1.25); G.powCost=Math.round(G.powCost*1.6); powC.textContent=G.powCost; toast('攻撃力アップ'); }});
+upRate.addEventListener('click',()=>{ if(tryBuy(G.rateCost)){ G.rate=Math.max(0.12, G.rate*0.82); G.rateCost=Math.round(G.rateCost*1.7); rateC.textContent=G.rateCost; toast('連射アップ'); }});
+autoBtn.addEventListener('click',()=>{ G.auto=!G.auto; autoBtn.textContent=G.auto?'ON':'OFF'; });
+
+// ===== HUD =====
+function updateHUD(){
+  lifeEl.textContent=G.life; goldEl.textContent=G.gold;
+  stageEl.textContent=G.stage+1; waveEl.textContent=G.wave; wmaxEl.textContent=G.wavemax;
+}
+
+// ===== ループ =====
+let last=0; function loop(ts){
+  requestAnimationFrame(loop);
+  const dt=Math.min(40, ts-last)||16; last=ts;
+  if(G.paused){draw();return;}
+  const mul=G.speed;
+
+  // クールダウン
+  G.cd=Math.max(0, G.cd-dt*0.001*mul);
+
+  // オート狙撃
+  if(G.auto && G.cd<=0){
+    // もっとも左に近い敵のレーンを撃つ
+    let target=null, best=9999;
+    for(const e of G.enemies){ if(!e.alive) continue; if(e.x<best){best=e.x; target=e;}}
+    if(target){ fireToLane(Math.round(target.y-0.5)); }
   }
-  window.addEventListener("resize", fit);
 
-  /* ===== Toast ===== */
-  const toastEl=$("#toast"); let toastTimer=null;
-  function toast(s){clearTimeout(toastTimer);toastEl.textContent=s;toastEl.style.opacity=1;toastTimer=setTimeout(()=>toastEl.style.opacity=0,1400);}
-
-  /* ===== Audio（SFX/BGM。簡略化しつつ段階的に勇ましく） ===== */
-  const AudioSys={ctx:null,master:null,sfx:null,bgm:null,on:false,bgmOn:false,bpm:86,timer:null,step:0,theme:'calm',density:1};
-  function ensureCtx(){ if(AudioSys.ctx) return; const Ctx=window.AudioContext||window.webkitAudioContext; const ctx=new Ctx();
-    const master=ctx.createGain(); master.gain.value=0.9; master.connect(ctx.destination);
-    const sfx=ctx.createGain(); sfx.gain.value=0.9; sfx.connect(master);
-    const bgm=ctx.createGain(); bgm.gain.value=0.28; bgm.connect(master);
-    AudioSys.ctx=ctx; AudioSys.master=master; AudioSys.sfx=sfx; AudioSys.bgm=bgm; }
-  function resumeCtx(){ if(AudioSys.ctx&&AudioSys.ctx.state!=="running") AudioSys.ctx.resume(); }
-  function setAudioOn(v){ ensureCtx(); resumeCtx(); AudioSys.on=v; AudioSys.master.gain.value=v?0.9:0; updateAudioButtons(); }
-  function setBGMOn(v){ ensureCtx(); resumeCtx(); AudioSys.bgmOn=v; if(v) startBGM(); else stopBGM(); updateAudioButtons(); }
-  function updateAudioButtons(){ $("#btnAudio").textContent = AudioSys.on? "🔊 音 ON":"🔇 音 OFF";
-                                 $("#btnBGM").textContent   = AudioSys.bgmOn? "♪ BGM ON":"♪ BGM OFF"; }
-  function oscBurst(o){ o=o||{}; if(!AudioSys.on||!AudioSys.ctx) return; const ctx=AudioSys.ctx,osc=ctx.createOscillator(),g=ctx.createGain();
-    osc.type=o.type||"sine"; osc.frequency.value=o.freq||440; osc.connect(g); g.connect(o.out==="bgm"?AudioSys.bgm:AudioSys.sfx);
-    const t=ctx.currentTime; g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(o.gain||0.25,t+0.01); g.gain.exponentialRampToValueAtTime(0.0001,t+(o.dur||0.12));
-    if(o.glide) osc.frequency.exponentialRampToValueAtTime(Math.max(80,(o.freq||440)*o.glide),t+(o.dur||0.12)*0.9);
-    osc.start(t); osc.stop(t+(o.dur||0.12)+0.02); }
-  function noiseBurst(o){ o=o||{}; if(!AudioSys.on||!AudioSys.ctx) return; const ctx=AudioSys.ctx,buf=ctx.createBuffer(1,ctx.sampleRate*(o.dur||0.18),ctx.sampleRate),data=buf.getChannelData(0);
-    for(let i=0;i<data.length;i++) data[i]=Math.random()*2-1; const src=ctx.createBufferSource(); src.buffer=buf;
-    const f=ctx.createBiquadFilter(); f.type="lowpass"; f.frequency.value=o.lp||1200;
-    const g=ctx.createGain(); g.gain.value=o.gain||0.28; src.connect(f); f.connect(g); g.connect(o.out==="bgm"?AudioSys.bgm:AudioSys.sfx);
-    const t=ctx.currentTime; g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(g.gain.value,t+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t+(o.dur||0.18));
-    src.start(t); src.stop(t+(o.dur||0.18)+0.02); }
-  const SFX={ui:()=>oscBurst({freq:880,dur:0.08,type:"sine",gain:0.18}), place:()=>oscBurst({freq:540,dur:0.09,type:"triangle",gain:0.22}),
-    upgrade:()=>{oscBurst({freq:640,dur:0.12,type:"triangle",gain:0.22});oscBurst({freq:960,dur:0.12,type:"triangle",gain:0.18});},
-    sell:()=>oscBurst({freq:360,dur:0.12,type:"sine",gain:0.18}), shotArcher:()=>oscBurst({freq:1100,dur:0.06,type:"square",gain:0.16,glide:0.6}),
-    shotCannon:()=>noiseBurst({dur:0.12,lp:800,gain:0.22}), shotIce:()=>oscBurst({freq:1400,dur:0.08,type:"sine",gain:0.14}),
-    boom:()=>noiseBurst({dur:0.22,lp:1200,gain:0.32}), coin:()=>{oscBurst({freq:1200,dur:0.08,type:"sine",gain:0.18});oscBurst({freq:1600,dur:0.08,type:"sine",gain:0.14});},
-    hit:()=>oscBurst({freq:380,dur:0.06,type:"square",gain:0.12}), start:()=>{oscBurst({freq:600,dur:0.12,type:"triangle",gain:0.2});oscBurst({freq:900,dur:0.12,type:"triangle",gain:0.18});},
-    clear:()=>{oscBurst({freq:740,dur:0.14,type:"triangle",gain:0.22});oscBurst({freq:988,dur:0.18,type:"triangle",gain:0.22});},
-    gameover:()=>oscBurst({freq:300,dur:0.3,type:"sine",gain:0.25,glide:0.4})};
-  function themeForStage(i){ if(i<=3) return {name:"calm",bpm:86,density:1}; if(i<=6) return {name:"adventure",bpm:98,density:2}; return {name:"heroic",bpm:112,density:3}; }
-  function startBGM(){ stopBGM(); if(!AudioSys.on) return; ensureCtx(); resumeCtx();
-    const tick = (60000/AudioSys.bpm)/4; AudioSys.step=0;
-    AudioSys.timer=setInterval(()=>{ if(!AudioSys.bgmOn||!AudioSys.on) return;
-      const step=AudioSys.step%16, bar=Math.floor(AudioSys.step/16)%8; let chords;
-      if(AudioSys.theme==="calm") chords=[[261.63,329.63,392],[220,261.63,329.63],[174.61,220,261.63],[196,246.94,293.66]];
-      else if(AudioSys.theme==="adventure") chords=[[293.66,349.23,440],[233.08,277.18,349.23],[174.61,220,261.63],[261.63,329.63,392]];
-      else chords=[[329.63,392,493.88],[261.63,329.63,392],[196,246.94,392],[293.66,369.99,440]];
-      const ch=chords[bar%chords.length], d=AudioSys.density;
-      if(step%8===0) noiseBurst({dur:0.08,lp:400,gain:0.13+0.03*d,out:"bgm"});
-      if(step%2===0) noiseBurst({dur:0.04,lp:6000,gain:0.06+0.02*d,out:"bgm"});
-      if(step===0||(d>=2&&step===8)||(d>=3&&step===12)) oscBurst({freq:ch[0]/2,dur:0.16+0.02*d,type:"sawtooth",gain:0.10+0.02*d,glide:0.9,out:"bgm"});
-      if(step%4===0||(d>=2&&step%4===2)){oscBurst({freq:ch[0],dur:0.14,type:"triangle",gain:0.08+0.01*d,out:"bgm"});
-        oscBurst({freq:ch[1],dur:0.14,type:"triangle",gain:0.07+0.01*d,out:"bgm"});oscBurst({freq:ch[2],dur:0.14,type:"triangle",gain:0.07+0.01*d,out:"bgm"});}
-      if(d>=1&&step%2===1){const seq=[0,1,2,1],note=ch[seq[step%seq.length]];oscBurst({freq:note*2,dur:0.10,type:"sine",gain:0.06+0.01*d,out:"bgm"});}
-      AudioSys.step++; }, tick);
+  // 敵移動
+  for(const e of G.enemies){
+    if(!e.alive) continue;
+    e.x -= e.spd * dt*0.0025 * mul;
+    if(e.x<=0.5){ // 到達
+      e.alive=false; G.life--; SFX.dmg(); if(G.life<=0){ gameOver(); return; }
+      updateHUD();
+    }
   }
-  function stopBGM(){ if(AudioSys.timer){clearInterval(AudioSys.timer); AudioSys.timer=null;} }
-  function applyTheme(stageIdx,waveIdx){ const t=themeForStage(stageIdx); AudioSys.theme=t.name;
-    const waveBoost=Math.min(12,Math.floor((waveIdx||0)/2)*2);
-    AudioSys.bpm=t.bpm+waveBoost; AudioSys.density=t.density+(waveIdx>6?1:0);
-    if(AudioSys.bgmOn&&AudioSys.on) startBGM(); }
 
-  /* ===== 定数 ===== */
-  const PATH=2, BUILD=1, BLOCK=0;
-  const TowerSpec={archer:{name:"アーチャー",cost:60,range:3.6,rate:0.65,dmg:18,fly:true,aoe:0,slow:0,upScale:1.55},
-                   cannon:{name:"キャノン",cost:80,range:3.2,rate:1.1,dmg:28,fly:false,aoe:1.2,slow:0,upScale:1.6},
-                   ice:{name:"アイス",cost:70,range:3.0,rate:1.2,dmg:4,fly:true,aoe:0.8,slow:0.45,upScale:1.6}};
-  const EnemySpec={slime:{hp:60,spd:1.0,gold:7,fly:false,color:"#67e8f9"},
-                   wolf:{hp:55,spd:1.7,gold:8,fly:false,color:"#f59e0b"},
-                   orc:{hp:140,spd:0.85,gold:12,fly:false,color:"#86efac"},
-                   bat:{hp:50,spd:1.2,gold:9,fly:true,color:"#c084fc"},
-                   boss:{hp:850,spd:0.8,gold:60,fly:false,color:"#f472b6"}};
-
-  /* ===== 直線ステージ ===== */
-  function blank(){const g=[];for(let y=0;y<ROWS;y++){const r=[];for(let x=0;x<COLS;x++)r.push(BUILD);g.push(r);}return g;}
-  function carveStraight(grid){
-    for(let x=1;x<COLS-1;x++){ grid[7][x]=PATH; if(8<ROWS) grid[8][x]=PATH; }
-    for(let xx=0;xx<COLS;xx++){grid[0][xx]=BLOCK;grid[ROWS-1][xx]=BLOCK;}
-    for(let yy=0;yy<ROWS;yy++){grid[yy][0]=BLOCK;grid[yy][COLS-1]=BLOCK;}
-    return grid;
-  }
-  function buildPath(){return [{x:1.5,y:7.5},{x:23.5,y:7.5}];}
-  const waves10=[
-    "slime,10","slime,12","wolf,8","slime,10|wolf,6","orc,6","bat,10","orc,6|wolf,8","slime,14|bat,6","orc,10","boss,1|wolf,12"
-  ];
-  const Stages=(function(){
-    const names=["草原の道","曲がりくねる丘","湾曲平原","長い街道","石畳の折返し","蛇の谷","段丘の道","風鳴りの平地","巨兵の行軍","黒鉄の終路"];
-    const golds=[120,110,120,140,150,160,170,180,190,220];
-    const lifes=[20,18,18,16,16,14,14,12,12,12];
-    const out=[];
-    for(let i=0;i<10;i++) out.push({name:names[i],life:lifes[i],gold:golds[i],waves:waves10,grid:carveStraight(blank()),waypoints:buildPath()});
-    return out;
-  })();
-
-  /* ===== 状態/HUD ===== */
-  const G={stageIdx:0,grid:null,way:null,life:20,gold:100,waveIdx:0,waveMax:0,running:false,paused:false,speed:1,
-           towers:[],bullets:[],enemies:[],sel:null,building:null,tick:0};
-  const SAVE_KEY="RG10_SAVE_PP";
-  function saveProgress(){ try{localStorage.setItem(SAVE_KEY,JSON.stringify({stageIdx:G.stageIdx,unlocked:G.stageIdx+1}));}catch(e){} }
-  function loadProgress(){ try{const r=localStorage.getItem(SAVE_KEY);return r?JSON.parse(r):null;}catch(e){return null;} }
-
-  const lifeEl=$("#life"),goldEl=$("#gold"),waveEl=$("#wave"),waveMaxEl=$("#waveMax"),stageEl=$("#stage");
-  const btnStartWave=$("#btnStart"),btnPause=$("#btnPause"),btnSpeed=$("#btnSpeed"),
-        btnUp=$("#btnUpgrade"),btnSell=$("#btnSell"),btnNext=$("#btnNextStage");
-  const upCostEl=$("#upCost"),sellAmtEl=$("#sellAmt"); const btnAudio=$("#btnAudio"),btnBGM=$("#btnBGM");
-
-  function updateHUD(){ lifeEl.textContent=G.life; goldEl.textContent=G.gold; waveEl.textContent=G.waveIdx; waveMaxEl.textContent=G.waveMax; stageEl.textContent=G.stageIdx+1;
-    if(G.sel){upCostEl.textContent=String(towerCostToUpgrade(G.sel));sellAmtEl.textContent=String(towerSellPrice(G.sel));} else {upCostEl.textContent="-";sellAmtEl.textContent="-";} }
-
-  /* ===== ステージ・Wave ===== */
-  function clone2D(a){return a.map(r=>r.slice(0));}
-  function startStage(i){ const s=Stages[i]; if(!s) return;
-    G.stageIdx=i; G.grid=clone2D(s.grid); G.way=s.waypoints.slice(0); G.life=s.life; G.gold=s.gold;
-    G.waveIdx=0; G.waveMax=s.waves.length; G.running=false; G.paused=false; G.speed=1;
-    G.towers=[]; G.bullets=[]; G.enemies=[]; G.sel=null; G.building=null; G.tick=0;
-    fit(); updateHUD(); toast("Stage "+(i+1)+": "+s.name); applyTheme(G.stageIdx,G.waveIdx); updateStartBlink(); }
-  function normWave(w){ if(typeof w==="string") return w; if(w&&w.length) return w.join("|"); return ""; }
-  function parsePack(p){ const s=normWave(p); return s.split("|").map(v=>{const pp=(v||"").split(","); return {type:(pp[0]||"slime").trim(),n:parseInt(pp[1]||"1",10)};}); }
-  let spawning=false, spawnQueue=[];
-  function startWave(){ if(G.running||spawning) return; const s=Stages[G.stageIdx]; if(G.waveIdx>=s.waves.length) return;
-    G.running=true; spawning=true; spawnQueue=[]; const packs=parsePack(s.waves[G.waveIdx]); for(const pk of packs) for(let j=0;j<pk.n;j++) spawnQueue.push(pk.type);
-    SFX.start(); applyTheme(G.stageIdx,G.waveIdx); toast("Wave "+(G.waveIdx+1)+" 開始！"); updateStartBlink(); }
-  function waveDone(){ G.running=false; G.waveIdx++; if(G.waveIdx>=G.waveMax){ toast("ステージクリア！ 下のボタンから次へ"); SFX.clear(); saveProgress(); }
-    else { toast("Wave "+G.waveIdx+"/"+G.waveMax+" クリア"); SFX.ui(); } updateHUD(); updateStartBlink(); }
-
-  /* ===== タワー/敵/弾 ===== */
-  function spawnEnemy(type){ const sp=EnemySpec[type]||EnemySpec.slime; const pos=G.way[0];
-    return {type,x:pos.x,y:pos.y,i:0,t:0,hp:sp.hp,hpMax:sp.hp,spd:sp.spd,gold:sp.gold,fly:sp.fly,slow:0,slowT:0,color:sp.color,dead:false}; }
-  function canBuildAt(cx,cy){ if(cx<0||cy<0||cx>=COLS||cy>=ROWS) return false; if(G.grid[cy][cx]!==BUILD) return false;
-    return !G.towers.some(t=>t.cx===cx&&t.cy===cy); }
-  function addTower(type,cx,cy){ const spec=TowerSpec[type]; if(!spec) return false; if(G.gold<spec.cost){toast("お金が足りない");return false;}
-    if(!canBuildAt(cx,cy)){toast("そこには置けません");return false;}
-    G.gold-=spec.cost; const t={type,cx,cy,lv:1,cd:0,range:spec.range,rate:spec.rate,dmg:spec.dmg,fly:spec.fly,aoe:spec.aoe,slow:spec.slow,baseCost:spec.cost,upScale:spec.upScale};
-    G.towers.push(t); SFX.place(); updateHUD(); onPlacedFirstTowerAutoStart(); return true; }
-  function towerCostToUpgrade(t){return Math.round(t.baseCost*Math.pow(t.upScale,t.lv-1)*0.8);}
-  function towerSellPrice(t){let invest=t.baseCost; for(let i=1;i<t.lv;i++) invest+=Math.round(t.baseCost*Math.pow(t.upScale,i-1)*0.8); return Math.round(invest*0.6);}
-  function upgradeSel(){ if(!G.sel) return; const t=G.sel,c=towerCostToUpgrade(t); if(G.gold<c){toast("お金が足りない");return;}
-    G.gold-=c; t.lv++; t.range*=1.08; t.rate*=0.93; t.dmg=Math.round(t.dmg*1.2); SFX.upgrade(); updateHUD(); toast("強化した！"); }
-  function sellSel(){ if(!G.sel) return; const v=towerSellPrice(G.sel); G.gold+=v; G.towers=G.towers.filter(tt=>tt!==G.sel); G.sel=null; updateHUD(); SFX.sell(); toast("売却した"); }
-  function inRange(t,e){ const dx=(e.x-(t.cx+0.5)), dy=(e.y-(t.cy+0.5)); return (dx*dx+dy*dy) <= (t.range*t.range); }
-  function pickTarget(t){ let best=null,bp=-1; for(const e of G.enemies){ if(e.dead)continue; if(!inRange(t,e))continue; if(!t.fly&&e.fly)continue; const prog=e.i+e.t; if(prog>bp){best=e;bp=prog;} } return best; }
-
-  /* ===== ループ ===== */
-  let last=0;
-  function loop(ts){
-    requestAnimationFrame(loop);
-    const dt=Math.min(40,ts-last)||16; last=ts;
-    const mul=(G.paused?0:1)*G.speed; if(!mul){render();return;}
-
-    if(spawning){ if(spawnQueue.length>0 && (G.tick%10===0)){ const type=spawnQueue.shift(); G.enemies.push(spawnEnemy(type)); }
-      if(spawnQueue.length===0) spawning=false; }
-
-    for(const e of G.enemies){ if(e.dead) continue;
-      const spd=e.spd*(e.slow>0?(1-e.slow):1); e.slowT=Math.max(0,e.slowT-dt*0.001*mul); if(e.slowT<=0) e.slow=0;
-      const a=G.way[e.i], b=G.way[e.i+1]; if(!b){ e.dead=true; G.life-=1; updateHUD(); if(G.life<=0){gameOver();return;} continue; }
-      const dx=b.x-a.x, dy=b.y-a.y, segLen=Math.hypot(dx,dy), step=(spd*dt*0.0025*mul)/Math.max(0.0001,segLen);
-      e.t+=step; if(e.t>=1){e.i++; e.t=0;} e.x=a.x+dx*e.t; e.y=a.y+dy*e.t; }
-
-    for(const t of G.towers){ t.cd-=dt*0.001*mul; if(t.cd>0) continue;
-      const tg=pickTarget(t); if(!tg) continue; t.cd=t.rate;
-      if(t.aoe>0){ G.bullets.push({x:(t.cx+0.5),y:(t.cy+0.5),tx:tg.x,ty:tg.y,spd:12,aoe:t.aoe,dmg:t.dmg,slow:t.slow,ttl:1.2,type:t.type});
-        if(t.type==="cannon") SFX.shotCannon(); else SFX.shotIce();
-      }else{ G.bullets.push({x:(t.cx+0.5),y:(t.cy+0.5),tx:tg.x,ty:tg.y,spd:18,aoe:0,dmg:t.dmg,slow:t.slow,ttl:1.8,type:t.type}); SFX.shotArcher(); } }
-
-    for(const b of G.bullets){ const dx=b.tx-b.x, dy=b.ty-b.y, len=Math.hypot(dx,dy)||1;
-      b.x+=(dx/len)*b.spd*dt*0.01*mul; b.y+=(dy/len)*b.spd*dt*0.01*mul; b.ttl-=dt*0.001*mul;
-      for(const e of G.enemies){ if(e.dead) continue; const d2=(e.x-b.x)*(e.x-b.x)+(e.y-b.y)*(e.y-b.y);
-        const hitR=b.aoe>0?(b.aoe*b.aoe):0.12; if(d2<=hitR){ if(b.aoe>0){ for(const e2 of G.enemies){ if(e2.dead) continue;
-              const dd=(e2.x-b.x)*(e2.x-b.x)+(e2.y-b.y)*(e2.y-b.y); if(dd<=b.aoe*b.aoe && (!e2.fly || (e2.fly && TowerSpec.ice.fly))) applyHit(e2,b); }
-            SFX.boom(); } else { applyHit(e,b); SFX.hit(); } b.ttl=0; break; } } }
-    G.bullets=G.bullets.filter(b=>b.ttl>0);
-
-    if(G.running && !spawning && G.enemies.every(e=>e.dead)) waveDone();
-
-    G.tick++; render();
-  }
-  function applyHit(e,b){ e.hp-=b.dmg; if(b.slow>0){e.slow=Math.max(e.slow,b.slow); e.slowT=1.2;} if(e.hp<=0){e.dead=true; G.gold+=e.gold; updateHUD(); SFX.coin();} }
-  function gameOver(){ G.paused=true; toast("ゲームオーバー！"); SFX.gameover(); }
-
-  /* ===== 描画 ===== */
-  function render(){
-    // DPR は canvas.width/height に既に反映済み（ピクセルパーフェクト）
-    ctx.clearRect(0,0,cv.width,cv.height);
-
-    // タイル
-    for(let y=0;y<ROWS;y++){
-      for(let x=0;x<COLS;x++){
-        const v=(G.grid&&G.grid[y])?G.grid[y][x]:BUILD, px=x*TILE, py=y*TILE;
-        ctx.fillStyle=(v===PATH)?"#34547a":(v===BUILD?"#121d2c":"#0b1422");
-        ctx.fillRect(px,py,TILE,TILE);
+  // 弾
+  for(const s of G.shots){ s.x += s.spd * dt*0.01 * mul; }
+  // ヒット
+  for(const s of G.shots){
+    for(const e of G.enemies){
+      if(!e.alive) continue;
+      if(Math.abs(s.y-e.y)<0.6 && Math.abs(s.x-e.x)<0.6){
+        e.hp -= s.dmg; SFX.hit(); s.x=99;
+        if(e.hp<=0){ e.alive=false; G.gold+=e.gold; SFX.kill(); SFX.coin(); updateHUD(); }
       }
     }
+  }
+  // 片付け
+  G.shots = G.shots.filter(s=>s.x<COLS+1);
+  // ウェーブ終了判定
+  if(G.enemies.every(e=>!e.alive) && G.waveStarted){
+    G.wave++; G.waveStarted=false;
+    if(G.wave>=G.wavemax){ toast('ステージクリア！ ▶ 次へ'); }
+    else setTimeout(()=>{G.waveStarted=true; startWave(); updateHUD();}, 500);
+  }
 
-    // 中央直線のルート
-    ctx.strokeStyle="rgba(110,231,183,.85)"; ctx.lineWidth=3;
-    ctx.beginPath(); ctx.moveTo(1.5*TILE, 7.5*TILE); ctx.lineTo(23.5*TILE, 7.5*TILE); ctx.stroke();
-    ctx.fillStyle="#22c55e"; ctx.beginPath(); ctx.arc(1.5*TILE,7.5*TILE,8,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle="#ef4444"; ctx.beginPath(); ctx.arc(23.5*TILE,7.5*TILE,8,0,Math.PI*2); ctx.fill();
+  draw();
+}
 
-    // グリッド線
-    ctx.fillStyle="rgba(255,255,255,.03)";
-    for(let gy=0;gy<=ROWS;gy++) ctx.fillRect(0, gy*TILE, COLS*TILE, 1);
-    for(let gx=0;gx<=COLS;gx++) ctx.fillRect(gx*TILE, 0, 1, ROWS*TILE);
+function gameOver(){ G.paused=true; toast('ゲームオーバー'); }
 
-    // タワー
-    for(const t of G.towers){
-      const cx=(t.cx+0.5)*TILE, cy=(t.cy+0.5)*TILE;
-      if(G.sel===t){ ctx.beginPath(); ctx.arc(cx,cy,t.range*TILE,0,Math.PI*2); ctx.strokeStyle="rgba(76,201,240,.35)"; ctx.lineWidth=2; ctx.stroke(); }
-      ctx.fillStyle=(t.type==="archer")?"#4cc9f0":(t.type==="cannon"?"#f59e0b":"#8be9fd");
-      ctx.beginPath(); ctx.arc(cx,cy,TILE*0.36,0,Math.PI*2); ctx.fill();
-      ctx.fillStyle="#fff"; ctx.font="600 12px system-ui"; ctx.textAlign="center"; ctx.fillText(String(t.lv),cx,cy+4);
-    }
+function draw(){
+  ctx.clearRect(0,0,cv.width,cv.height);
 
-    // 敵
-    for(const e of G.enemies){
-      if(e.dead) continue; const x=e.x*TILE, y=e.y*TILE;
-      ctx.fillStyle="rgba(0,0,0,.3)"; ctx.beginPath(); ctx.ellipse(x,y+7,12,6,0,0,Math.PI*2); ctx.fill();
-      ctx.fillStyle=e.color; ctx.beginPath(); ctx.arc(x,y,14,0,Math.PI*2); ctx.fill();
-      const w=28,h=5; ctx.fillStyle="#111"; ctx.fillRect(x-w/2,y-22,w,h); ctx.fillStyle="#22c55e"; ctx.fillRect(x-w/2,y-22, Math.max(0,w*(e.hp/e.hpMax)), h);
-      if(e.slow>0){ ctx.fillStyle="#60a5fa"; ctx.fillRect(x-w/2,y-28, w*(e.slow), 3); }
-    }
-
-    // 弾
-    for(const b of G.bullets){
-      const bx=b.x*TILE, by=b.y*TILE; ctx.fillStyle=b.aoe>0?"#fde047":"#fca5a5";
-      if(b.aoe>0){ ctx.beginPath(); ctx.arc(bx,by,7,0,Math.PI*2); ctx.fill(); } else { ctx.fillRect(bx-4,by-4,8,8); }
-    }
-
-    // 建設プレビュー
-    if(G.building && hoverCell && hoverCell.cx>=0){
-      const ok=canBuildAt(hoverCell.cx,hoverCell.cy);
-      ctx.strokeStyle=ok?"rgba(76,201,240,.9)":"rgba(239,68,68,.9)";
-      ctx.lineWidth=3; ctx.strokeRect(hoverCell.cx*TILE+2, hoverCell.cy*TILE+2, TILE-4, TILE-4);
+  // 背景タイル
+  for(let y=0;y<ROWS;y++){
+    for(let x=0;x<COLS;x++){
+      ctx.fillStyle=(y%2^x%2)?'#101b2b':'#0f1928';
+      ctx.fillRect(x*TILE,y*TILE,TILE,TILE);
     }
   }
 
-  /* ===== 入力（ズレ無し） ===== */
-  let hoverCell={cx:-1,cy:-1};
-  function getCellFromEvent(ev){
-    const r=cv.getBoundingClientRect();
-    const x=((ev.touches&&ev.touches.length?ev.touches[0].clientX:ev.clientX)-r.left) * (cv.width / r.width);
-    const y=((ev.touches&&ev.touches.length?ev.touches[0].clientY:ev.clientY)-r.top)  * (cv.height / r.height);
-    return {cx:Math.max(0,Math.min(COLS-1, Math.floor(x / TILE))),
-            cy:Math.max(0,Math.min(ROWS-1, Math.floor(y / TILE)))};
+  // レーン（3本）
+  ctx.fillStyle='rgba(76,201,240,.10)';
+  for(const L of LANES) ctx.fillRect(0,(L-0.2)*TILE, cv.width, 1.4*TILE);
+
+  // 砲台（左側）
+  ctx.fillStyle='#7bc6ff';
+  for(const L of LANES){
+    ctx.beginPath(); ctx.arc(1.0*TILE, (L+0.5)*TILE, TILE*0.35, 0, Math.PI*2); ctx.fill();
   }
-  function onCanvasTap(ev){ const c=getCellFromEvent(ev); if(G.building){ if(addTower(G.building.type,c.cx,c.cy)){ G.building=null; clearSelShop(); } } else { selectTowerAt(c.cx,c.cy); } }
-  cv.addEventListener('pointermove', e=>{hoverCell=getCellFromEvent(e);});
-  cv.addEventListener('pointerdown', e=>{e.preventDefault(); onCanvasTap(e);});
-  cv.addEventListener('touchstart', e=>{onCanvasTap(e);}, {passive:true});
-  cv.addEventListener('mousedown', e=>{onCanvasTap(e);});
-  function selectTowerAt(cx,cy){ G.sel=null; for(const t of G.towers){ if(t.cx===cx&&t.cy===cy){ G.sel=t; break; } } updateHUD(); }
 
-  /* ===== UIボタン ===== */
-  function bind(el,fn){ el.addEventListener('click',fn); el.addEventListener('pointerdown',e=>e.preventDefault()); el.addEventListener('touchstart',()=>{}, {passive:true}); }
-  bind(btnStartWave,()=>{startWave();SFX.ui();});
-  bind(btnPause,()=>{G.paused=!G.paused;btnPause.textContent=G.paused?'▶':'⏸';SFX.ui();toast(G.paused?'一時停止':'再開');});
-  bind(btnSpeed,()=>{G.speed=(G.speed===1?2:1);btnSpeed.textContent='⏩ ×'+G.speed;SFX.ui();toast('速度×'+G.speed);});
-  bind(btnUp,upgradeSel); bind(btnSell,sellSel);
-  bind(btnNext,()=>{ if(G.waveIdx<G.waveMax){toast('まだクリアしていません');return;} if(G.stageIdx<Stages.length-1) startStage(G.stageIdx+1); else toast('全ステージクリア！'); applyTheme(G.stageIdx,G.waveIdx); SFX.ui(); });
-  document.querySelectorAll(".placeBtn").forEach(btn=>bind(btn,()=>{ const t=btn.getAttribute("data-t"); G.building={type:t}; highlightSelShop(t); toast(TowerSpec[t].name+" を配置：マスをタップ"); SFX.ui(); }));
-  function highlightSelShop(t){document.querySelectorAll("#shop .card").forEach(c=>c.classList.toggle("sel", c.getAttribute("data-tower")===t));}
-  function clearSelShop(){document.querySelectorAll("#shop .card").forEach(c=>c.classList.remove("sel"));}
+  // 敵
+  for(const e of G.enemies){
+    if(!e.alive) continue;
+    const x=e.x*TILE, y=e.y*TILE;
+    ctx.fillStyle='rgba(0,0,0,.28)'; ctx.beginPath(); ctx.ellipse(x,y+7,12,6,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle=e.color; ctx.beginPath(); ctx.arc(x,y,14,0,Math.PI*2); ctx.fill();
+    // HPバー
+    const w=28; ctx.fillStyle='#111'; ctx.fillRect(x-w/2,y-22,w,5);
+    ctx.fillStyle='#22c55e'; ctx.fillRect(x-w/2,y-22, Math.max(0,w*(e.hp/e.hpMax)), 5);
+  }
 
-  /* ===== 導線 ===== */
-  let firstPlaced=false;
-  function onPlacedFirstTowerAutoStart(){ if(firstPlaced) return; firstPlaced=true; if(!G.running && G.waveIdx===0){ startWave(); } }
-  function updateStartBlink(){ const b=$("#btnStart"); if(!G.running && G.waveIdx===0) b.classList.add('blink'); else b.classList.remove('blink'); }
+  // 弾
+  ctx.fillStyle='#fde047';
+  for(const s of G.shots){ ctx.beginPath(); ctx.arc(s.x*TILE,s.y*TILE,6,0,Math.PI*2); ctx.fill(); }
 
-  /* ===== タイトル → 開始 ===== */
-  const title=$("#title"), gameRoot=$("#game");
-  function startGame(withSound){ title.style.display='none'; gameRoot.style.display='block';
-    fit(); if(withSound){ setAudioOn(true); setBGMOn(true);} else { setAudioOn(false); setBGMOn(false);}
-    const prog=loadProgress(); const startIdx=prog?Math.min(Stages.length-1,prog.stageIdx):0; startStage(startIdx);
-    toast("中央の道の上下に置いて ▶ 次ウェーブ"); requestAnimationFrame(loop); }
-  function primeAudio(){ try{ if(!AudioSys.ctx) ensureCtx(); resumeCtx(); }catch(e){} }
-  $("#btnStartSound").addEventListener("click",()=>{primeAudio();startGame(true);});
-  $("#btnStartMute").addEventListener("click",()=>{startGame(false);});
+  // UIヒント（CD）
+  if(G.cd>0){
+    ctx.fillStyle='rgba(255,255,255,.2)';
+    ctx.fillRect(0, (LANES[0]-0.2)*TILE, TILE*0.6*(G.cd/0.6), 1.4*TILE);
+  }
+}
 
-  // 初期：背景だけ描画（サイズ確定）
-  window.addEventListener("load",()=>{fit(); render();});
+// ===== ボタン =====
+pauseBtn.addEventListener('click',()=>{G.paused=!G.paused; pauseBtn.textContent=G.paused?'▶':'⏸';});
+let speed=1; speedBtn.addEventListener('click',()=>{speed=(speed===1?2:1);G.speed=speed; speedBtn.textContent='⏩ ×'+speed;});
+bgmBtn.addEventListener('click',()=>{ if(!AudioSys.on) setAudio(true); setBGM(!AudioSys.bgmOn); });
 
-  // サウンドトグル
-  bind(btnAudio,()=>{setAudioOn(!AudioSys.on);toast(AudioSys.on?'音：ON':'音：OFF');});
-  bind(btnBGM,()=>{if(!AudioSys.on) setAudioOn(true); setBGMOn(!AudioSys.bgmOn); toast(AudioSys.bgmOn?'BGM：ON':'BGM：OFF');});
-  updateAudioButtons();
+function nextStage(){
+  if(G.wave<G.wavemax) return;
+  if(G.stage<9){ startStage(G.stage+1); } else { toast('全クリア！'); }
+}
+
+// ===== スタート =====
+function startGame(withSound){
+  title.style.display='none'; game.style.display='block';
+  fit(); draw();
+  if(withSound){setAudio(true); setBGM(true);} else {setAudio(false); setBGM(false);}
+  startStage(0);
+  requestAnimationFrame(loop);
+  // 最初のWave
+  G.wave=0; G.waveStarted=true; startWave(); updateHUD(); SFX.start();
+}
+startSound.addEventListener('click',()=>{ensureCtx(); resumeCtx(); startGame(true);});
+startMute.addEventListener('click',()=>startGame(false));
+
+// 画面タップで次ステージ（クリア時のみ）
+cv.addEventListener('dblclick',()=>nextStage());
+
+// 初期レンダリング
+window.addEventListener('load',()=>{fit(); draw();});
 })();
 </script>
 </body>

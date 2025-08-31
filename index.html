@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>Road Guardians 10</title>
+<title>Road Guardians 10 (Straight Road)</title>
 <style>
   :root{--bg:#0f1320;--panel:#151b28;--accent:#4cc9f0;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444;}
   html,body{margin:0;background:var(--bg);color:#eef;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
@@ -42,7 +42,7 @@
   <div id="title">
     <div class="tbox">
       <h1 class="logo">Road Guardians 10</h1>
-      <p class="subtitle">スマホ向け 本格タワーディフェンス（全10ステージ）</p>
+      <p class="subtitle">スマホ向け 本格タワーディフェンス（全10ステージ／直線ルート）</p>
       <div class="startRow">
         <button id="btnStartSound" class="btn ok">▶ サウンド ON で開始</button>
         <button id="btnStartMute" class="btn alt">▶ ミュートで開始</button>
@@ -98,44 +98,45 @@
 (function(){
   /* ===== エラー可視化 ===== */
   var errBox=document.getElementById('err');
-  window.addEventListener('error', function(e){ errBox.style.display='block'; errBox.textContent='JS Error: '+(e.message||e.error); });
+  window.addEventListener('error',function(e){errBox.style.display='block';errBox.textContent='JS Error: '+(e.message||e.error);});
 
   /* ===== DOM / Canvas ===== */
-  function $(s){ return document.querySelector(s); }
+  function $(s){return document.querySelector(s);}
   var cv=$("#cv"), ctx=cv.getContext("2d");
-  var DPR=Math.max(1, Math.min(2, window.devicePixelRatio||1));
+  var DPR=Math.max(1,Math.min(2,window.devicePixelRatio||1));
   var COLS=24, ROWS=15, TILE=40;
-  function fit(){ var w=Math.min(960, window.innerWidth*0.96); var h=w*0.6; cv.style.width=w+"px"; cv.style.height=h+"px"; cv.width=(w*DPR)|0; cv.height=(h*DPR)|0; TILE=Math.floor(cv.width/COLS); }
+  function fit(){
+    var w=Math.min(960, window.innerWidth*0.96);
+    var h=w*0.6;
+    cv.style.width=w+"px"; cv.style.height=h+"px";
+    cv.width=(w*DPR)|0; cv.height=(h*DPR)|0;
+    TILE = Math.floor(cv.width / COLS); // ←整数割りでズレ防止
+  }
   window.addEventListener("resize", fit);
 
   /* ===== Toast ===== */
   var toastEl=$("#toast"), toastTimer=null;
-  function toast(s){ clearTimeout(toastTimer); toastEl.textContent=s; toastEl.style.opacity=1;
-    toastTimer=setTimeout(function(){toastEl.style.opacity=0;},1400); }
+  function toast(s){clearTimeout(toastTimer);toastEl.textContent=s;toastEl.style.opacity=1;toastTimer=setTimeout(function(){toastEl.style.opacity=0;},1400);}
 
-  /* ===== Audio ===== */
+  /* ===== Audio（省略同等） ===== */
   var AudioSys={ctx:null,master:null,sfx:null,bgm:null,on:false,bgmOn:false,bpm:86,tickMS:0,timer:null,step:0,theme:'calm',density:1};
-  function ensureCtx(){ if(AudioSys.ctx) return; var Ctx=window.AudioContext||window.webkitAudioContext; var ctx=new Ctx();
-    var master=ctx.createGain(); master.gain.value=0.9; master.connect(ctx.destination);
-    var sfx=ctx.createGain(); sfx.gain.value=0.9; sfx.connect(master);
-    var bgm=ctx.createGain(); bgm.gain.value=0.28; bgm.connect(master);
-    AudioSys.ctx=ctx; AudioSys.master=master; AudioSys.sfx=sfx; AudioSys.bgm=bgm; }
-  function resumeCtx(){ if(AudioSys.ctx && AudioSys.ctx.state!=="running") AudioSys.ctx.resume(); }
-  function setAudioOn(v){ ensureCtx(); resumeCtx(); AudioSys.on=v; AudioSys.master.gain.value=v?0.9:0.0; updateAudioButtons(); }
-  function setBGMOn(v){ ensureCtx(); resumeCtx(); AudioSys.bgmOn=v; if(v) startBGM(); else stopBGM(); updateAudioButtons(); }
-  function updateAudioButtons(){ $("#btnAudio").textContent=(AudioSys.on?"🔊 音 ON":"🔇 音 OFF"); $("#btnBGM").textContent=(AudioSys.bgmOn?"♪ BGM ON":"♪ BGM OFF"); }
-  function oscBurst(o){ o=o||{}; var freq=o.freq||440,dur=o.dur||0.12,type=o.type||"sine",gain=o.gain||0.25,glide=o.glide||0,out=o.out||"sfx";
-    if(!AudioSys.on||!AudioSys.ctx) return; var ctx=AudioSys.ctx,osc=ctx.createOscillator(),g=ctx.createGain();
-    osc.type=type; osc.frequency.value=freq; osc.connect(g); g.connect(out==="bgm"?AudioSys.bgm:AudioSys.sfx);
-    var t=ctx.currentTime; g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(gain,t+0.01); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
-    if(glide) osc.frequency.exponentialRampToValueAtTime(Math.max(80,freq*glide),t+dur*0.9); osc.start(t); osc.stop(t+dur+0.02); }
-  function noiseBurst(o){ o=o||{}; var dur=o.dur||0.18,lp=o.lp||1200,gain=o.gain||0.28,out=o.out||"sfx";
-    if(!AudioSys.on||!AudioSys.ctx) return; var ctx=AudioSys.ctx,buf=ctx.createBuffer(1,ctx.sampleRate*dur,ctx.sampleRate),data=buf.getChannelData(0);
-    for(var i=0;i<data.length;i++) data[i]=Math.random()*2-1;
-    var src=ctx.createBufferSource(); src.buffer=buf; var f=ctx.createBiquadFilter(); f.type="lowpass"; f.frequency.value=lp;
-    var g=ctx.createGain(); g.gain.value=gain; src.connect(f); f.connect(g); g.connect(out==="bgm"?AudioSys.bgm:AudioSys.sfx);
-    var t=ctx.currentTime; g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(gain,t+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
-    src.start(t); src.stop(t+dur+0.02); }
+  function ensureCtx(){if(AudioSys.ctx)return;var Ctx=window.AudioContext||window.webkitAudioContext;var ctx=new Ctx();
+    var master=ctx.createGain();master.gain.value=0.9;master.connect(ctx.destination);
+    var sfx=ctx.createGain();sfx.gain.value=0.9;sfx.connect(master);
+    var bgm=ctx.createGain();bgm.gain.value=0.28;bgm.connect(master);
+    AudioSys.ctx=ctx;AudioSys.master=master;AudioSys.sfx=sfx;AudioSys.bgm=bgm;}
+  function resumeCtx(){if(AudioSys.ctx&&AudioSys.ctx.state!=="running")AudioSys.ctx.resume();}
+  function setAudioOn(v){ensureCtx();resumeCtx();AudioSys.on=v;AudioSys.master.gain.value=v?0.9:0;updateAudioButtons();}
+  function setBGMOn(v){ensureCtx();resumeCtx();AudioSys.bgmOn=v;if(v)startBGM();else stopBGM();updateAudioButtons();}
+  function updateAudioButtons(){$("#btnAudio").textContent=(AudioSys.on?"🔊 音 ON":"🔇 音 OFF");$("#btnBGM").textContent=(AudioSys.bgmOn?"♪ BGM ON":"♪ BGM OFF");}
+  function oscBurst(o){o=o||{};if(!AudioSys.on||!AudioSys.ctx)return;var ctx=AudioSys.ctx,osc=ctx.createOscillator(),g=ctx.createGain();
+    osc.type=o.type||"sine";osc.frequency.value=o.freq||440;osc.connect(g);g.connect(o.out==="bgm"?AudioSys.bgm:AudioSys.sfx);
+    var t=ctx.currentTime;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(o.gain||0.25,t+0.01);g.gain.exponentialRampToValueAtTime(0.0001,t+(o.dur||0.12));
+    if(o.glide)osc.frequency.exponentialRampToValueAtTime(Math.max(80,(o.freq||440)*o.glide),t+(o.dur||0.12)*0.9);osc.start(t);osc.stop(t+(o.dur||0.12)+0.02);}
+  function noiseBurst(o){o=o||{};if(!AudioSys.on||!AudioSys.ctx)return;var ctx=AudioSys.ctx,buf=ctx.createBuffer(1,ctx.sampleRate*(o.dur||0.18),ctx.sampleRate),data=buf.getChannelData(0);
+    for(var i=0;i<data.length;i++)data[i]=Math.random()*2-1;var src=ctx.createBufferSource();src.buffer=buf;var f=ctx.createBiquadFilter();f.type="lowpass";f.frequency.value=o.lp||1200;
+    var g=ctx.createGain();g.gain.value=o.gain||0.28;src.connect(f);f.connect(g);g.connect(o.out==="bgm"?AudioSys.bgm:AudioSys.sfx);var t=ctx.currentTime;g.gain.setValueAtTime(0,t);
+    g.gain.linearRampToValueAtTime(g.gain.value,t+0.02);g.gain.exponentialRampToValueAtTime(0.0001,t+(o.dur||0.18));src.start(t);src.stop(t+(o.dur||0.18)+0.02);}
   var SFX={ui:function(){oscBurst({freq:880,dur:0.08,type:"sine",gain:0.18});},place:function(){oscBurst({freq:540,dur:0.09,type:"triangle",gain:0.22});},
     upgrade:function(){oscBurst({freq:640,dur:0.12,type:"triangle",gain:0.22});oscBurst({freq:960,dur:0.12,type:"triangle",gain:0.18});},
     sell:function(){oscBurst({freq:360,dur:0.12,type:"sine",gain:0.18});},shotArcher:function(){oscBurst({freq:1100,dur:0.06,type:"square",gain:0.16,glide:0.6});},
@@ -144,164 +145,135 @@
     hit:function(){oscBurst({freq:380,dur:0.06,type:"square",gain:0.12});},start:function(){oscBurst({freq:600,dur:0.12,type:"triangle",gain:0.2});oscBurst({freq:900,dur:0.12,type:"triangle",gain:0.18});},
     clear:function(){oscBurst({freq:740,dur:0.14,type:"triangle",gain:0.22});oscBurst({freq:988,dur:0.18,type:"triangle",gain:0.22});},
     gameover:function(){oscBurst({freq:300,dur:0.3,type:"sine",gain:0.25,glide:0.4});}};
-  function themeForStage(i){ if(i<=3) return {name:"calm",bpm:86,density:1}; if(i<=6) return {name:"adventure",bpm:98,density:2}; return {name:"heroic",bpm:112,density:3}; }
-  function startBGM(){ stopBGM(); if(!AudioSys.on) return; ensureCtx(); resumeCtx(); AudioSys.tickMS=(60000/AudioSys.bpm)/4; AudioSys.step=0;
-    AudioSys.timer=setInterval(function(){ if(!AudioSys.bgmOn||!AudioSys.on) return; var step=AudioSys.step%16; var bar=Math.floor(AudioSys.step/16)%8; var chords;
-      if(AudioSys.theme==="calm"){ chords=[[261.63,329.63,392],[220,261.63,329.63],[174.61,220,261.63],[196,246.94,293.66]]; }
-      else if(AudioSys.theme==="adventure"){ chords=[[293.66,349.23,440],[233.08,277.18,349.23],[174.61,220,261.63],[261.63,329.63,392]]; }
-      else { chords=[[329.63,392,493.88],[261.63,329.63,392],[196,246.94,392],[293.66,369.99,440]]; }
-      var ch=chords[bar%chords.length], d=AudioSys.density;
-      if(step%8===0) noiseBurst({dur:0.08,lp:400,gain:0.13+0.03*d,out:"bgm"});
-      if(step%2===0) noiseBurst({dur:0.04,lp:6000,gain:0.06+0.02*d,out:"bgm"});
-      if(step===0||(d>=2&&step===8)||(d>=3&&step===12)){ oscBurst({freq:ch[0]/2,dur:0.16+0.02*d,type:"sawtooth",gain:0.10+0.02*d,glide:0.9,out:"bgm"}); }
-      if(step%4===0||(d>=2&&step%4===2)){ oscBurst({freq:ch[0],dur:0.14,type:"triangle",gain:0.08+0.01*d,out:"bgm"}); oscBurst({freq:ch[1],dur:0.14,type:"triangle",gain:0.07+0.01*d,out:"bgm"}); oscBurst({freq:ch[2],dur:0.14,type:"triangle",gain:0.07+0.01*d,out:"bgm"}); }
-      if(d>=1 && step%2===1){ var seq=[0,1,2,1]; var note=ch[seq[step%seq.length]]; oscBurst({freq:note*2,dur:0.10,type:"sine",gain:0.06+0.01*d,out:"bgm"}); }
-      AudioSys.step++; }, AudioSys.tickMS); }
-  function stopBGM(){ if(AudioSys.timer){ clearInterval(AudioSys.timer); AudioSys.timer=null; } }
-  function applyTheme(stageIdx,waveIdx){ var t=themeForStage(stageIdx); AudioSys.theme=t.name; var waveBoost=Math.min(12, Math.floor((waveIdx||0)/2)*2);
-    AudioSys.bpm=t.bpm+waveBoost; AudioSys.density=t.density+(waveIdx>6?1:0); if(AudioSys.bgmOn&&AudioSys.on) startBGM(); }
+  function themeForStage(i){if(i<=3)return{name:"calm",bpm:86,density:1};if(i<=6)return{name:"adventure",bpm:98,density:2};return{name:"heroic",bpm:112,density:3};}
+  function startBGM(){stopBGM();if(!AudioSys.on)return;ensureCtx();resumeCtx();AudioSys.tickMS=(60000/AudioSys.bpm)/4;AudioSys.step=0;
+    AudioSys.timer=setInterval(function(){if(!AudioSys.bgmOn||!AudioSys.on)return;var step=AudioSys.step%16;var bar=Math.floor(AudioSys.step/16)%8;var chords;
+      if(AudioSys.theme==="calm"){chords=[[261.63,329.63,392],[220,261.63,329.63],[174.61,220,261.63],[196,246.94,293.66]];}
+      else if(AudioSys.theme==="adventure"){chords=[[293.66,349.23,440],[233.08,277.18,349.23],[174.61,220,261.63],[261.63,329.63,392]];}
+      else{chords=[[329.63,392,493.88],[261.63,329.63,392],[196,246.94,392],[293.66,369.99,440]];}
+      var ch=chords[bar%chords.length],d=AudioSys.density;
+      if(step%8===0)noiseBurst({dur:0.08,lp:400,gain:0.13+0.03*d,out:"bgm"});
+      if(step%2===0)noiseBurst({dur:0.04,lp:6000,gain:0.06+0.02*d,out:"bgm"});
+      if(step===0||(d>=2&&step===8)||(d>=3&&step===12))oscBurst({freq:ch[0]/2,dur:0.16+0.02*d,type:"sawtooth",gain:0.10+0.02*d,glide:0.9,out:"bgm"});
+      if(step%4===0||(d>=2&&step%4===2)){oscBurst({freq:ch[0],dur:0.14,type:"triangle",gain:0.08+0.01*d,out:"bgm"});
+        oscBurst({freq:ch[1],dur:0.14,type:"triangle",gain:0.07+0.01*d,out:"bgm"});oscBurst({freq:ch[2],dur:0.14,type:"triangle",gain:0.07+0.01*d,out:"bgm"});}
+      if(d>=1&&step%2===1){var seq=[0,1,2,1],note=ch[seq[step%seq.length]];oscBurst({freq:note*2,dur:0.10,type:"sine",gain:0.06+0.01*d,out:"bgm"});}
+      AudioSys.step++;},AudioSys.tickMS);}
+  function stopBGM(){if(AudioSys.timer){clearInterval(AudioSys.timer);AudioSys.timer=null;}}
+  function applyTheme(stageIdx,waveIdx){var t=themeForStage(stageIdx);AudioSys.theme=t.name;var waveBoost=Math.min(12,Math.floor((waveIdx||0)/2)*2);
+    AudioSys.bpm=t.bpm+waveBoost;AudioSys.density=t.density+(waveIdx>6?1:0);if(AudioSys.bgmOn&&AudioSys.on)startBGM();}
 
-  /* ===== ゲーム定数 ===== */
+  /* ===== 定数 ===== */
   var PATH=2, BUILD=1, BLOCK=0;
-  var TowerSpec={ archer:{name:"アーチャー",cost:60,range:3.6,rate:0.65,dmg:18,fly:true,aoe:0,slow:0,upScale:1.55},
-                  cannon:{name:"キャノン",cost:80,range:3.2,rate:1.1,dmg:28,fly:false,aoe:1.2,slow:0,upScale:1.6},
-                  ice:{name:"アイス",cost:70,range:3.0,rate:1.2,dmg:4,fly:true,aoe:0.8,slow:0.45,upScale:1.6} };
-  var EnemySpec={ slime:{hp:60,spd:1.0,gold:7,fly:false,color:"#67e8f9"},
-                  wolf:{hp:55,spd:1.7,gold:8,fly:false,color:"#f59e0b"},
-                  orc:{hp:140,spd:0.85,gold:12,fly:false,color:"#86efac"},
-                  bat:{hp:50,spd:1.2,gold:9,fly:true,color:"#c084fc"},
-                  boss:{hp:850,spd:0.8,gold:60,fly:false,color:"#f472b6"} };
+  var TowerSpec={archer:{name:"アーチャー",cost:60,range:3.6,rate:0.65,dmg:18,fly:true,aoe:0,slow:0,upScale:1.55},
+                 cannon:{name:"キャノン",cost:80,range:3.2,rate:1.1,dmg:28,fly:false,aoe:1.2,slow:0,upScale:1.6},
+                 ice:{name:"アイス",cost:70,range:3.0,rate:1.2,dmg:4,fly:true,aoe:0.8,slow:0.45,upScale:1.6}};
+  var EnemySpec={slime:{hp:60,spd:1.0,gold:7,fly:false,color:"#67e8f9"},
+                 wolf:{hp:55,spd:1.7,gold:8,fly:false,color:"#f59e0b"},
+                 orc:{hp:140,spd:0.85,gold:12,fly:false,color:"#86efac"},
+                 bat:{hp:50,spd:1.2,gold:9,fly:true,color:"#c084fc"},
+                 boss:{hp:850,spd:0.8,gold:60,fly:false,color:"#f472b6"}};
 
-  /* ===== ステージ定義 ===== */
-  function blank(){ var g=[],y,x; for(y=0;y<ROWS;y++){ var r=[]; for(x=0;x<COLS;x++) r.push(BUILD); g.push(r);} return g; }
-  function carvePath(grid,pts){ function inb(x,y){return x>=0&&y>=0&&x<COLS&&y<ROWS;}
-    for(var i=0;i<pts.length-1;i++){ var a=pts[i],b=pts[i+1],x1=a[0],y1=a[1],x2=b[0],y2=b[1];
-      var dx=x2>x1?1:(x2<x1?-1:0), dy=y2>y1?1:(y2<y1?-1:0); var x=x1,y=y1;
-      while(x!==x2||y!==y2){ if(inb(x,y))grid[y][x]=PATH; if(inb(x+1,y))grid[y][x+1]=PATH; if(inb(x,y+1)&&grid[y+1])grid[y+1][x]=PATH; x+=dx;y+=dy; }
-      if(inb(x2,y2)) grid[y2][x2]=PATH;
-    }
-    for(var xx=0;xx<COLS;xx++){ grid[0][xx]=BLOCK; grid[ROWS-1][xx]=BLOCK; }
-    for(var yy=0;yy<ROWS;yy++){ grid[yy][0]=BLOCK; grid[yy][COLS-1]=BLOCK; }
+  /* ===== ステージ（全てまっすぐ：左端→右端、中央行 y=7） ===== */
+  var StraightPts=[[1,7],[23,7]]; // ← 完全直線
+  function blank(){var g=[],y,x;for(y=0;y<ROWS;y++){var r=[];for(x=0;x<COLS;x++)r.push(BUILD);g.push(r);}return g;}
+  function carveStraight(grid){ // 横一直線を太めに
+    for(var x=1;x<COLS-1;x++){ grid[7][x]=PATH; if(7+1<ROWS) grid[8][x]=PATH; } // 2タイル幅で視認性UP
+    for(var xx=0;xx<COLS;xx++){grid[0][xx]=BLOCK;grid[ROWS-1][xx]=BLOCK;}
+    for(var yy=0;yy<ROWS;yy++){grid[yy][0]=BLOCK;grid[yy][COLS-1]=BLOCK;}
     return grid;
   }
-  function buildPathFromPts(pts){ var arr=[],i; for(i=0;i<pts.length;i++){ arr.push({x:(pts[i][0]+0.5), y:(pts[i][1]+0.5)});} return arr; }
+  function buildPathFromPts(pts){var arr=[],i;for(i=0;i<pts.length;i++){arr.push({x:(pts[i][0]+0.5),y:(pts[i][1]+0.5)});}return arr;}
 
-  var StagesRaw=[
-    { name:"草原の道", life:20, gold:120, pathPts:[[1,7],[6,7],[6,3],[12,3],[12,11],[20,11],[22,11]], waves:[
-      "slime,10","slime,12","wolf,8","slime,10|wolf,6","orc,6","bat,10","orc,6|wolf,8","slime,14|bat,6","orc,10","boss,1|wolf,12"
-    ]},
-    { name:"曲がりくねる丘", life:18, gold:110, pathPts:[[1,2],[20,2],[20,6],[3,6],[3,11],[22,11]], waves:[
-      "slime,12","wolf,10","slime,10|wolf,6","orc,6","bat,10","orc,8|wolf,8","slime,20","orc,10|bat,8","orc,10|wolf,12","boss,1|orc,10|bat,10"
-    ]},
-    { name:"湾曲平原", life:18, gold:120, pathPts:[[1,4],[8,4],[8,9],[16,9],[16,5],[22,5],[22,12]], waves:[
-      "slime,14","wolf,12","orc,6","bat,12","slime,12|orc,6","wolf,14","orc,10","bat,14|slime,10","orc,12|wolf,10","boss,1|wolf,14"
-    ]},
-    { name:"長い街道", life:16, gold:140, pathPts:[[1,7],[10,7],[10,3],[14,3],[14,11],[20,11],[23,11]], waves:[
-      "slime,16","wolf,12","orc,8","bat,12","slime,16|wolf,8","orc,10","bat,16","orc,10|wolf,12","orc,12|bat,12","boss,1|orc,12|wolf,12"
-    ]},
-    { name:"石畳の折返し", life:16, gold:150, pathPts:[[1,3],[12,3],[12,12],[22,12]], waves:[
-      "slime,16","wolf,14","orc,8","bat,14","slime,14|wolf,10","orc,10","bat,16","orc,12|wolf,12","orc,14|bat,12","boss,1|orc,12|wolf,14"
-    ]},
-    { name:"蛇の谷", life:14, gold:160, pathPts:[[1,6],[6,6],[6,10],[11,10],[11,4],[16,4],[16,10],[22,10],[22,12]], waves:[
-      "slime,18","wolf,16","orc,10","bat,16","slime,18|wolf,12","orc,12","bat,18","orc,12|wolf,14","orc,14|bat,14","boss,1|orc,14|wolf,16"
-    ]},
-    { name:"段丘の道", life:14, gold:170, pathPts:[[1,11],[6,11],[6,3],[12,3],[12,11],[18,11],[18,6],[23,6]], waves:[
-      "slime,18","wolf,18","orc,12","bat,18","slime,18|wolf,14","orc,14","bat,18","orc,14|wolf,16","orc,16|bat,16","boss,1|orc,16|wolf,18"
-    ]},
-    { name:"風鳴りの平地", life:12, gold:180, pathPts:[[1,5],[9,5],[9,10],[17,10],[17,5],[23,5]], waves:[
-      "wolf,18","wolf,18|bat,12","slime,20","orc,12","bat,18","slime,16|wolf,16","orc,16","bat,20|wolf,16","orc,18|bat,18","boss,1|wolf,20"
-    ]},
-    { name:"巨兵の行軍", life:12, gold:190, pathPts:[[1,9],[8,9],[8,4],[15,4],[15,11],[23,11]], waves:[
-      "orc,14","orc,14|slime,20","orc,16","bat,18","wolf,20","orc,18|bat,18","orc,20","wolf,22|bat,20","orc,22","boss,1|orc,18|wolf,18"
-    ]},
-    { name:"黒鉄の終路", life:12, gold:220, pathPts:[[1,7],[6,7],[6,3],[12,3],[12,11],[18,11],[18,5],[23,5]], waves:[
-      "slime,24|wolf,18","orc,18","bat,22","orc,20|wolf,20","bat,24|slime,20","orc,22|bat,22","wolf,26","orc,24","orc,20|wolf,22|bat,22","boss,2"
-    ]}
+  var waves10=[
+    "slime,10","slime,12","wolf,8","slime,10|wolf,6","orc,6","bat,10","orc,6|wolf,8","slime,14|bat,6","orc,10","boss,1|wolf,12"
   ];
-  var Stages=(function(){ var out=[],i; for(i=0;i<StagesRaw.length;i++){ var s=StagesRaw[i];
-    out.push({name:s.name,life:s.life,gold:s.gold,waves:s.waves,grid:carvePath(blank(),s.pathPts),waypoints:buildPathFromPts(s.pathPts)}); }
-    return out; })();
+  var Stages=(function(){
+    var names=["草原の道","曲がりくねる丘","湾曲平原","長い街道","石畳の折返し","蛇の谷","段丘の道","風鳴りの平地","巨兵の行軍","黒鉄の終路"];
+    var golds=[120,110,120,140,150,160,170,180,190,220];
+    var lifes=[20,18,18,16,16,14,14,12,12,12];
+    var out=[],i;
+    for(i=0;i<10;i++){
+      out.push({name:names[i],life:lifes[i],gold:golds[i],waves:waves10,grid:carveStraight(blank()),waypoints:buildPathFromPts(StraightPts)});
+    }
+    return out;
+  })();
 
   /* ===== 状態/HUD ===== */
   var G={stageIdx:0,grid:null,way:null,life:20,gold:100,waveIdx:0,waveMax:0,running:false,paused:false,speed:1,
          towers:[],bullets:[],enemies:[],sel:null,building:null,tick:0};
-  var SAVE_KEY="RG10_SAVE_ES5_FULL_FIX";
-  function saveProgress(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify({stageIdx:G.stageIdx,unlocked:G.stageIdx+1})); }catch(e){} }
-  function loadProgress(){ try{ var r=localStorage.getItem(SAVE_KEY); return r?JSON.parse(r):null; }catch(e){ return null; } }
+  var SAVE_KEY="RG10_SAVE_STRAIGHT";
+  function saveProgress(){try{localStorage.setItem(SAVE_KEY,JSON.stringify({stageIdx:G.stageIdx,unlocked:G.stageIdx+1}));}catch(e){}}
+  function loadProgress(){try{var r=localStorage.getItem(SAVE_KEY);return r?JSON.parse(r):null;}catch(e){return null;}}
 
-  var lifeEl=$("#life"), goldEl=$("#gold"), waveEl=$("#wave"), waveMaxEl=$("#waveMax"), stageEl=$("#stage");
-  var btnStartWave=$("#btnStart"), btnPause=$("#btnPause"), btnSpeed=$("#btnSpeed"), btnUp=$("#btnUpgrade"), btnSell=$("#btnSell"), btnNext=$("#btnNextStage");
-  var upCostEl=$("#upCost"), sellAmtEl=$("#sellAmt"); var btnAudio=$("#btnAudio"), btnBGM=$("#btnBGM");
+  var lifeEl=$("#life"),goldEl=$("#gold"),waveEl=$("#wave"),waveMaxEl=$("#waveMax"),stageEl=$("#stage");
+  var btnStartWave=$("#btnStart"),btnPause=$("#btnPause"),btnSpeed=$("#btnSpeed"),btnUp=$("#btnUpgrade"),btnSell=$("#btnSell"),btnNext=$("#btnNextStage");
+  var upCostEl=$("#upCost"),sellAmtEl=$("#sellAmt"); var btnAudio=$("#btnAudio"),btnBGM=$("#btnBGM");
 
-  function updateHUD(){ lifeEl.textContent=G.life; goldEl.textContent=G.gold; waveEl.textContent=G.waveIdx; waveMaxEl.textContent=G.waveMax; stageEl.textContent=G.stageIdx+1;
-    if(G.sel){ upCostEl.textContent=String(towerCostToUpgrade(G.sel)); sellAmtEl.textContent=String(towerSellPrice(G.sel)); } else { upCostEl.textContent="-"; sellAmtEl.textContent="-"; } }
+  function updateHUD(){lifeEl.textContent=G.life;goldEl.textContent=G.gold;waveEl.textContent=G.waveIdx;waveMaxEl.textContent=G.waveMax;stageEl.textContent=G.stageIdx+1;
+    if(G.sel){upCostEl.textContent=String(towerCostToUpgrade(G.sel));sellAmtEl.textContent=String(towerSellPrice(G.sel));}else{upCostEl.textContent="-";sellAmtEl.textContent="-";}}
 
-  /* ===== ステージ開始 / ウェーブ ===== */
-  function clone2D(a){ var r=[],i; for(i=0;i<a.length;i++) r.push(a[i].slice(0)); return r; }
-  function startStage(i){ var s=Stages[i]; if(!s) return; G.stageIdx=i; G.grid=clone2D(s.grid); G.way=s.waypoints.slice(0); G.life=s.life; G.gold=s.gold;
+  /* ===== ステージ開始 / Wave ===== */
+  function clone2D(a){var r=[],i;for(i=0;i<a.length;i++)r.push(a[i].slice(0));return r;}
+  function startStage(i){var s=Stages[i]; if(!s)return; G.stageIdx=i; G.grid=clone2D(s.grid); G.way=s.waypoints.slice(0); G.life=s.life; G.gold=s.gold;
     G.waveIdx=0; G.waveMax=s.waves.length; G.running=false; G.paused=false; G.speed=1;
     G.towers=[]; G.bullets=[]; G.enemies=[]; G.sel=null; G.building=null; G.tick=0;
-    fit(); updateHUD(); toast("Stage "+(i+1)+": "+s.name); applyTheme(G.stageIdx,G.waveIdx); updateStartBlink();
-  }
-
-  function normWave(w){ if(typeof w==="string") return w; if(w&&w.length) return w.join("|"); return ""; }
-  function parsePack(p){ var s=normWave(p); var parts=s.split("|"), out=[], i; for(i=0;i<parts.length;i++){ var pp=(parts[i]||"").split(",");
-      out.push({type:(pp[0]||"slime").trim(), n:parseInt(pp[1]||"1",10)}); } return out; }
-
-  var spawning=false, spawnQueue=[];
-  function startWave(){ if(G.running||spawning) return; var s=Stages[G.stageIdx]; if(G.waveIdx>=s.waves.length) return;
-    G.running=true; spawning=true; spawnQueue=[]; var packs=parsePack(s.waves[G.waveIdx]);
-    for(var i=0;i<packs.length;i++){ for(var j=0;j<packs[i].n;j++) spawnQueue.push(packs[i].type); }
-    SFX.start(); applyTheme(G.stageIdx,G.waveIdx); toast("Wave "+(G.waveIdx+1)+" 開始！"); updateStartBlink();
-  }
+    fit(); updateHUD(); toast("Stage "+(i+1)+": "+s.name); applyTheme(G.stageIdx,G.waveIdx); updateStartBlink(); }
+  function normWave(w){ if(typeof w==="string")return w; if(w&&w.length)return w.join("|"); return ""; }
+  function parsePack(p){var s=normWave(p);var parts=s.split("|"),out=[],i;for(i=0;i<parts.length;i++){var pp=(parts[i]||"").split(",");out.push({type:(pp[0]||"slime").trim(),n:parseInt(pp[1]||"1",10)});}return out;}
+  var spawning=false,spawnQueue=[];
+  function startWave(){ if(G.running||spawning)return; var s=Stages[G.stageIdx]; if(G.waveIdx>=s.waves.length)return;
+    G.running=true; spawning=true; spawnQueue=[]; var packs=parsePack(s.waves[G.waveIdx]); var i,j; for(i=0;i<packs.length;i++){for(j=0;j<packs[i].n;j++)spawnQueue.push(packs[i].type);}
+    SFX.start(); applyTheme(G.stageIdx,G.waveIdx); toast("Wave "+(G.waveIdx+1)+" 開始！"); updateStartBlink(); }
   function waveDone(){ G.running=false; G.waveIdx++; if(G.waveIdx>=G.waveMax){ toast("ステージクリア！ 下のボタンから次へ"); SFX.clear(); saveProgress(); }
     else { toast("Wave "+G.waveIdx+"/"+G.waveMax+" クリア"); SFX.ui(); } updateHUD(); updateStartBlink(); }
 
   /* ===== タワー/敵/弾 ===== */
-  function spawnEnemy(type){ var sp=EnemySpec[type]||EnemySpec.slime; var pos=G.way[0]; return {type:type,x:pos.x,y:pos.y,i:0,t:0,hp:sp.hp,hpMax:sp.hp,spd:sp.spd,gold:sp.gold,fly:sp.fly,slow:0,slowT:0,color:sp.color,dead:false}; }
-  function canBuildAt(cx,cy){ if(cx<0||cy<0||cx>=COLS||cy>=ROWS) return false; if(G.grid[cy][cx]!==BUILD) return false; for(var i=0;i<G.towers.length;i++){ var t=G.towers[i]; if(t.cx===cx&&t.cy===cy) return false; } return true; }
-  function addTower(type,cx,cy){ var spec=TowerSpec[type]; if(!spec) return false; if(G.gold<spec.cost){ toast("お金が足りない"); return false; } if(!canBuildAt(cx,cy)){ toast("そこには置けません"); return false; }
+  function spawnEnemy(type){var sp=EnemySpec[type]||EnemySpec.slime;var pos=G.way[0];return{type:type,x:pos.x,y:pos.y,i:0,t:0,hp:sp.hp,hpMax:sp.hp,spd:sp.spd,gold:sp.gold,fly:sp.fly,slow:0,slowT:0,color:sp.color,dead:false};}
+  function canBuildAt(cx,cy){ if(cx<0||cy<0||cx>=COLS||cy>=ROWS) return false; if(G.grid[cy][cx]!==BUILD) return false;
+    for(var i=0;i<G.towers.length;i++){var t=G.towers[i]; if(t.cx===cx&&t.cy===cy) return false;} return true; }
+  function addTower(type,cx,cy){var spec=TowerSpec[type]; if(!spec)return false; if(G.gold<spec.cost){toast("お金が足りない");return false;}
+    if(!canBuildAt(cx,cy)){toast("そこには置けません");return false;}
     G.gold-=spec.cost; var t={type:type,cx:cx,cy:cy,lv:1,cd:0,range:spec.range,rate:spec.rate,dmg:spec.dmg,fly:spec.fly,aoe:spec.aoe,slow:spec.slow,baseCost:spec.cost,upScale:spec.upScale};
     G.towers.push(t); SFX.place(); updateHUD(); onPlacedFirstTowerAutoStart(); return true; }
-  function towerCostToUpgrade(t){ return Math.round(t.baseCost*Math.pow(t.upScale,t.lv-1)*0.8); }
-  function towerSellPrice(t){ var invest=t.baseCost,i; for(i=1;i<t.lv;i++) invest+=Math.round(t.baseCost*Math.pow(t.upScale,i-1)*0.8); return Math.round(invest*0.6); }
-  function upgradeSel(){ if(!G.sel)return; var t=G.sel,c=towerCostToUpgrade(t); if(G.gold<c){toast("お金が足りない");return;} G.gold-=c; t.lv++; t.range*=1.08; t.rate*=0.93; t.dmg=Math.round(t.dmg*1.2); SFX.upgrade(); updateHUD(); toast("強化した！"); }
-  function sellSel(){ if(!G.sel)return; var v=towerSellPrice(G.sel); G.gold+=v; var n=[],i; for(i=0;i<G.towers.length;i++) if(G.towers[i]!==G.sel) n.push(G.towers[i]); G.towers=n; G.sel=null; updateHUD(); SFX.sell(); toast("売却した"); }
-  function inRange(t,e){ var dx=(e.x-(t.cx+0.5)), dy=(e.y-(t.cy+0.5)); return (dx*dx+dy*dy) <= (t.range*t.range); }
-  function pickTarget(t){ var best=null,bp=-1,i; for(i=0;i<G.enemies.length;i++){ var e=G.enemies[i]; if(e.dead)continue; if(!inRange(t,e))continue; if(!t.fly&&e.fly)continue; var prog=e.i+e.t; if(prog>bp){best=e;bp=prog;} } return best; }
+  function towerCostToUpgrade(t){return Math.round(t.baseCost*Math.pow(t.upScale,t.lv-1)*0.8);}
+  function towerSellPrice(t){var invest=t.baseCost,i;for(i=1;i<t.lv;i++)invest+=Math.round(t.baseCost*Math.pow(t.upScale,i-1)*0.8);return Math.round(invest*0.6);}
+  function upgradeSel(){if(!G.sel)return;var t=G.sel,c=towerCostToUpgrade(t);if(G.gold<c){toast("お金が足りない");return;}G.gold-=c;t.lv++;t.range*=1.08;t.rate*=0.93;t.dmg=Math.round(t.dmg*1.2);SFX.upgrade();updateHUD();toast("強化した！");}
+  function sellSel(){if(!G.sel)return;var v=towerSellPrice(G.sel);G.gold+=v;var n=[],i;for(i=0;i<G.towers.length;i++)if(G.towers[i]!==G.sel)n.push(G.towers[i]);G.towers=n;G.sel=null;updateHUD();SFX.sell();toast("売却した");}
+  function inRange(t,e){var dx=(e.x-(t.cx+0.5)),dy=(e.y-(t.cy+0.5));return (dx*dx+dy*dy) <= (t.range*t.range);}
+  function pickTarget(t){var best=null,bp=-1,i;for(i=0;i<G.enemies.length;i++){var e=G.enemies[i];if(e.dead)continue;if(!inRange(t,e))continue;if(!t.fly&&e.fly)continue;var prog=e.i+e.t;if(prog>bp){best=e;bp=prog;}}return best;}
 
   /* ===== ループ ===== */
   var last=0;
   function loop(ts){
     requestAnimationFrame(loop);
-    var dt=Math.min(40, ts-last)||16; last=ts;
-    var mul=(G.paused?0:1)*G.speed; if(!mul){ render(); return; }
+    var dt=Math.min(40,ts-last)||16; last=ts;
+    var mul=(G.paused?0:1)*G.speed; if(!mul){render();return;}
 
-    if(spawning){ if(spawnQueue.length>0 && (G.tick%10===0)){ var type=spawnQueue.shift(); G.enemies.push(spawnEnemy(type)); } if(spawnQueue.length===0) spawning=false; }
+    if(spawning){ if(spawnQueue.length>0 && (G.tick%10===0)){ var type=spawnQueue.shift(); G.enemies.push(spawnEnemy(type)); }
+      if(spawnQueue.length===0) spawning=false; }
 
     var i,e;
     for(i=0;i<G.enemies.length;i++){
-      e=G.enemies[i]; if(e.dead) continue;
-      var spd=e.spd*(e.slow>0?(1-e.slow):1); e.slowT=Math.max(0,e.slowT-dt*0.001*mul); if(e.slowT<=0) e.slow=0;
-      var w=G.way,a=w[e.i],b=w[e.i+1]; if(!b){ e.dead=true; G.life-=1; updateHUD(); if(G.life<=0){ gameOver(); return; } continue; }
-      var dx=b.x-a.x, dy=b.y-a.y, segLen=Math.sqrt(dx*dx+dy*dy), step=(spd*dt*0.0025*mul)/Math.max(0.0001,segLen);
-      e.t+=step; if(e.t>=1){ e.i++; e.t=0; } e.x=a.x+dx*e.t; e.y=a.y+dy*e.t;
+      e=G.enemies[i]; if(e.dead)continue;
+      var spd=e.spd*(e.slow>0?(1-e.slow):1); e.slowT=Math.max(0,e.slowT-dt*0.001*mul); if(e.slowT<=0)e.slow=0;
+      var w=G.way,a=w[e.i],b=w[e.i+1]; if(!b){e.dead=true;G.life-=1;updateHUD();if(G.life<=0){gameOver();return;}continue;}
+      var dx=b.x-a.x,dy=b.y-a.y,segLen=Math.sqrt(dx*dx+dy*dy),step=(spd*dt*0.0025*mul)/Math.max(0.0001,segLen);
+      e.t+=step; if(e.t>=1){e.i++; e.t=0;} e.x=a.x+dx*e.t; e.y=a.y+dy*e.t;
     }
 
     for(i=0;i<G.towers.length;i++){
-      var t=G.towers[i]; t.cd-=dt*0.001*mul; if(t.cd>0) continue;
-      var targ=pickTarget(t); if(!targ) continue; t.cd=t.rate;
-      if(t.aoe>0){ G.bullets.push({x:(t.cx+0.5),y:(t.cy+0.5),tx:targ.x,ty:targ.y,spd:12,aoe:t.aoe,dmg:t.dmg,slow:t.slow,ttl:1.2,type:t.type}); if(t.type==="cannon") SFX.shotCannon(); else SFX.shotIce(); }
-      else { G.bullets.push({x:(t.cx+0.5),y:(t.cy+0.5),tx:targ.x,ty:targ.y,spd:18,aoe:0,dmg:t.dmg,slow:t.slow,ttl:1.8,type:t.type}); SFX.shotArcher(); }
+      var t=G.towers[i]; t.cd-=dt*0.001*mul; if(t.cd>0)continue;
+      var tg=pickTarget(t); if(!tg)continue; t.cd=t.rate;
+      if(t.aoe>0){G.bullets.push({x:(t.cx+0.5),y:(t.cy+0.5),tx:tg.x,ty:tg.y,spd:12,aoe:t.aoe,dmg:t.dmg,slow:t.slow,ttl:1.2,type:t.type}); if(t.type==="cannon")SFX.shotCannon(); else SFX.shotIce();}
+      else {G.bullets.push({x:(t.cx+0.5),y:(t.cy+0.5),tx:tg.x,ty:tg.y,spd:18,aoe:0,dmg:t.dmg,slow:t.slow,ttl:1.8,type:t.type}); SFX.shotArcher();}
     }
 
     for(i=0;i<G.bullets.length;i++){
-      var b=G.bullets[i], dx=b.tx-b.x, dy=b.ty-b.y, len=Math.sqrt(dx*dx+dy*dy)||1;
+      var b=G.bullets[i],dx=b.tx-b.x,dy=b.ty-b.y,len=Math.sqrt(dx*dx+dy*dy)||1;
       b.x+=(dx/len)*b.spd*dt*0.01*mul; b.y+=(dy/len)*b.spd*dt*0.01*mul; b.ttl-=dt*0.001*mul;
-      var j; for(j=0;j<G.enemies.length;j++){ e=G.enemies[j]; if(e.dead) continue; var d2=(e.x-b.x)*(e.x-b.x)+(e.y-b.y)*(e.y-b.y);
-        var hitR=b.aoe>0?(b.aoe*b.aoe):0.12;
-        if(d2<=hitR){ if(b.aoe>0){ var k; for(k=0;k<G.enemies.length;k++){ var e2=G.enemies[k]; if(e2.dead) continue; var dd=(e2.x-b.x)*(e2.x-b.x)+(e2.y-b.y)*(e2.y-b.y); if(dd<=b.aoe*b.aoe && (!e2.fly || (e2.fly && TowerSpec.ice.fly))) applyHit(e2,b); } SFX.boom(); } else { applyHit(e,b); SFX.hit(); } b.ttl=0; break; }
-      }
+      var j; for(j=0;j<G.enemies.length;j++){e=G.enemies[j]; if(e.dead)continue; var d2=(e.x-b.x)*(e.x-b.x)+(e.y-b.y)*(e.y-b.y);
+        var hitR=b.aoe>0?(b.aoe*b.aoe):0.12; if(d2<=hitR){ if(b.aoe>0){var k;for(k=0;k<G.enemies.length;k++){var e2=G.enemies[k];if(e2.dead)continue;var dd=(e2.x-b.x)*(e2.x-b.x)+(e2.y-b.y)*(e2.y-b.y);if(dd<=b.aoe*b.aoe && (!e2.fly || (e2.fly && TowerSpec.ice.fly))) applyHit(e2,b);} SFX.boom();} else {applyHit(e,b); SFX.hit();} b.ttl=0; break; }}
     }
     var nb=[],ii; for(ii=0;ii<G.bullets.length;ii++) if(G.bullets[ii].ttl>0) nb.push(G.bullets[ii]); G.bullets=nb;
 
@@ -309,45 +281,28 @@
 
     G.tick++; render();
   }
-
-  function applyHit(e,b){ e.hp-=b.dmg; if(b.slow>0){ e.slow=Math.max(e.slow,b.slow); e.slowT=1.2; } if(e.hp<=0){ e.dead=true; G.gold+=e.gold; updateHUD(); SFX.coin(); } }
-  function gameOver(){ G.paused=true; toast("ゲームオーバー！"); SFX.gameover(); }
+  function applyHit(e,b){e.hp-=b.dmg;if(b.slow>0){e.slow=Math.max(e.slow,b.slow);e.slowT=1.2;}if(e.hp<=0){e.dead=true;G.gold+=e.gold;updateHUD();SFX.coin();}}
+  function gameOver(){G.paused=true;toast("ゲームオーバー！");SFX.gameover();}
 
   /* ===== 描画 ===== */
   function render(){
     ctx.save(); ctx.scale(DPR,DPR);
     var W=cv.width/DPR, H=cv.height/DPR; ctx.clearRect(0,0,W,H);
 
-    // タイル（道は濃い青、BUILDは暗め）
     for(var y=0;y<ROWS;y++){ for(var x=0;x<COLS;x++){
-      var v=(G.grid && G.grid[y])?G.grid[y][x]:BUILD, px=x*TILE, py=y*TILE;
+      var v=(G.grid&&G.grid[y])?G.grid[y][x]:BUILD, px=x*TILE, py=y*TILE;
       if(v===PATH){ ctx.fillStyle="#34547a"; } else if(v===BUILD){ ctx.fillStyle="#121d2c"; } else { ctx.fillStyle="#0b1422"; }
       ctx.fillRect(px,py,TILE,TILE);
-    } }
+    }}
 
-    // Wave中は道を明るく薄点滅
-    if (G.running){
-      ctx.globalAlpha = 0.25 + 0.25 * Math.abs(Math.sin(G.tick * 0.08));
-      for (var yy=0; yy<ROWS; yy++){
-        for (var xx=0; xx<COLS; xx++){
-          if (G.grid[yy][xx] === PATH){
-            ctx.fillStyle="#5fa8ff"; ctx.fillRect(xx*TILE, yy*TILE, TILE, TILE);
-          }
-        }
-      }
-      ctx.globalAlpha = 1;
-    }
+    // ルート線（中央まっすぐ）
+    ctx.strokeStyle="rgba(110,231,183,.85)"; ctx.lineWidth=3; ctx.beginPath();
+    ctx.moveTo((1+0.5)*TILE,(7+0.5)*TILE); ctx.lineTo((23+0.5)*TILE,(7+0.5)*TILE); ctx.stroke();
+    // スタート/ゴールピン
+    ctx.fillStyle="#22c55e"; ctx.beginPath(); ctx.arc((1.5)*TILE,(7.5)*TILE,8,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle="#ef4444"; ctx.beginPath(); ctx.arc((23.5)*TILE,(7.5)*TILE,8,0,Math.PI*2); ctx.fill();
 
-    // ルート線＋ピン
-    if(G.way && G.way.length>1){
-      ctx.strokeStyle="rgba(110,231,183,.85)"; ctx.lineWidth=3; ctx.beginPath();
-      ctx.moveTo(G.way[0].x*TILE, G.way[0].y*TILE); for(var i=1;i<G.way.length;i++) ctx.lineTo(G.way[i].x*TILE, G.way[i].y*TILE); ctx.stroke();
-      var s=G.way[0], g=G.way[G.way.length-1];
-      ctx.fillStyle="#22c55e"; ctx.beginPath(); ctx.arc(s.x*TILE,s.y*TILE,8,0,Math.PI*2); ctx.fill();
-      ctx.fillStyle="#ef4444"; ctx.beginPath(); ctx.arc(g.x*TILE,g.y*TILE,8,0,Math.PI*2); ctx.fill();
-    }
-
-    // グリッド細線
+    // グリッド
     ctx.fillStyle="rgba(255,255,255,.03)";
     for(var gy=0;gy<=ROWS;gy++) ctx.fillRect(0, gy*TILE, COLS*TILE, 1);
     for(var gx=0;gx<=COLS;gx++) ctx.fillRect(gx*TILE, 0, 1, ROWS*TILE);
@@ -361,7 +316,7 @@
       ctx.fillStyle="#fff"; ctx.font="600 12px system-ui"; ctx.textAlign="center"; ctx.fillText(String(t.lv),cx,cy+4);
     }
 
-    // 敵（視認性Up：半径14）
+    // 敵
     for(var eI=0;eI<G.enemies.length;eI++){
       var e=G.enemies[eI]; if(e.dead) continue; var x=e.x*TILE, y=e.y*TILE;
       ctx.fillStyle="rgba(0,0,0,.3)"; ctx.beginPath(); ctx.ellipse(x,y+7,12,6,0,0,Math.PI*2); ctx.fill();
@@ -370,7 +325,7 @@
       if(e.slow>0){ ctx.fillStyle="#60a5fa"; ctx.fillRect(x-w/2,y-28, w*(e.slow), 3); }
     }
 
-    // 弾（サイズUp）
+    // 弾
     for(var bI=0;bI<G.bullets.length;bI++){
       var b=G.bullets[bI], bx=b.x*TILE, by=b.y*TILE; ctx.fillStyle=b.aoe>0?"#fde047":"#fca5a5";
       if(b.aoe>0){ ctx.beginPath(); ctx.arc(bx,by,7,0,Math.PI*2); ctx.fill(); } else { ctx.fillRect(bx-4,by-4,8,8); }
@@ -386,7 +341,7 @@
     ctx.restore();
   }
 
-  /* ===== 入力（ズレ修正済み） ===== */
+  /* ===== 入力（ズレなし版） ===== */
   var hoverCell={cx:-1,cy:-1};
   function getCellFromEvent(ev){
     var r=cv.getBoundingClientRect();
@@ -403,27 +358,21 @@
   cv.addEventListener('pointerdown', function(e){ e.preventDefault(); onCanvasTap(e); });
   cv.addEventListener('touchstart', function(e){ onCanvasTap(e); }, {passive:true});
   cv.addEventListener('mousedown', function(e){ onCanvasTap(e); });
-
   function selectTowerAt(cx,cy){ var i; G.sel=null; for(i=0;i<G.towers.length;i++){ var t=G.towers[i]; if(t.cx===cx&&t.cy===cy){ G.sel=t; break; } } updateHUD(); }
 
   /* ===== UIボタン ===== */
-  function bind(el,fn){ el.addEventListener('pointerdown', function(e){ e.preventDefault(); fn(); });
-    el.addEventListener('touchstart', function(){ fn(); }, {passive:true}); el.addEventListener('mousedown', function(){ fn(); }); }
-  bind(btnStartWave, function(){ startWave(); SFX.ui(); });
-  bind(btnPause, function(){ G.paused=!G.paused; btnPause.textContent=G.paused?'▶':'⏸'; SFX.ui(); toast(G.paused?'一時停止':'再開'); });
-  bind(btnSpeed, function(){ G.speed=(G.speed===1?2:1); btnSpeed.textContent='⏩ ×'+G.speed; SFX.ui(); toast('速度×'+G.speed); });
-  bind(btnUp, function(){ upgradeSel(); });
-  bind(btnSell, function(){ sellSel(); });
-  bind(btnNext, function(){ if(G.waveIdx<G.waveMax){ toast('まだクリアしていません'); return; }
-    if(G.stageIdx<Stages.length-1) startStage(G.stageIdx+1); else toast('全ステージクリア！');
-    applyTheme(G.stageIdx,G.waveIdx); SFX.ui(); });
-  var placeBtns=document.querySelectorAll(".placeBtn"); for(var pi=0;pi<placeBtns.length;pi++){ (function(btn){
-    bind(btn,function(){ var t=btn.getAttribute("data-t"); G.building={type:t}; highlightSelShop(t); toast(TowerSpec[t].name+" を配置：マスをタップ"); SFX.ui(); });
-  })(placeBtns[pi]); }
-  function highlightSelShop(t){ var cards=document.querySelectorAll("#shop .card"),i; for(i=0;i<cards.length;i++){ var c=cards[i]; if(c.getAttribute("data-tower")===t) c.classList.add("sel"); else c.classList.remove("sel"); } }
-  function clearSelShop(){ var cards=document.querySelectorAll("#shop .card"),i; for(i=0;i<cards.length;i++) cards[i].classList.remove("sel"); }
+  function bind(el,fn){ el.addEventListener('pointerdown',function(e){e.preventDefault();fn();});
+    el.addEventListener('touchstart',function(){fn();},{passive:true}); el.addEventListener('mousedown',function(){fn();}); }
+  bind(btnStartWave,function(){startWave();SFX.ui();});
+  bind(btnPause,function(){G.paused=!G.paused;btnPause.textContent=G.paused?'▶':'⏸';SFX.ui();toast(G.paused?'一時停止':'再開');});
+  bind(btnSpeed,function(){G.speed=(G.speed===1?2:1);btnSpeed.textContent='⏩ ×'+G.speed;SFX.ui();toast('速度×'+G.speed);});
+  bind(btnUp,function(){upgradeSel();}); bind(btnSell,function(){sellSel();});
+  bind(btnNext,function(){if(G.waveIdx<G.waveMax){toast('まだクリアしていません');return;} if(G.stageIdx<Stages.length-1)startStage(G.stageIdx+1);else toast('全ステージクリア！'); applyTheme(G.stageIdx,G.waveIdx); SFX.ui();});
+  var placeBtns=document.querySelectorAll(".placeBtn"); for(var pi=0;pi<placeBtns.length;pi++){(function(btn){bind(btn,function(){var t=btn.getAttribute("data-t");G.building={type:t};highlightSelShop(t);toast(TowerSpec[t].name+" を配置：マスをタップ");SFX.ui();});})(placeBtns[pi]);}
+  function highlightSelShop(t){var cards=document.querySelectorAll("#shop .card"),i;for(i=0;i<cards.length;i++){var c=cards[i];if(c.getAttribute("data-tower")===t)c.classList.add("sel");else c.classList.remove("sel");}}
+  function clearSelShop(){var cards=document.querySelectorAll("#shop .card"),i;for(i=0;i<cards.length;i++)cards[i].classList.remove("sel");}
 
-  /* ===== 導線（最初に置いたら自動で開始 / Startボタン点滅） ===== */
+  /* ===== 導線 ===== */
   var firstPlaced=false;
   function onPlacedFirstTowerAutoStart(){ if(firstPlaced) return; firstPlaced=true; if(!G.running && G.waveIdx===0){ startWave(); } }
   function updateStartBlink(){ var b=document.getElementById('btnStart'); if(!G.running && G.waveIdx===0){ b.classList.add('blink'); } else { b.classList.remove('blink'); } }
@@ -433,17 +382,17 @@
   function startGame(withSound){ title.style.display='none'; gameRoot.style.display='block';
     fit(); if(withSound){ setAudioOn(true); setBGMOn(true);} else { setAudioOn(false); setBGMOn(false);}
     var prog=loadProgress(); var startIdx=prog?Math.min(Stages.length-1,prog.stageIdx):0; startStage(startIdx);
-    toast("道の横マスに置いて ▶ 次ウェーブ"); requestAnimationFrame(loop); }
+    toast("道（中央の横一線）の横マスに置いて ▶ 次ウェーブ"); requestAnimationFrame(loop); }
   function primeAudio(){ try{ if(!AudioSys.ctx) ensureCtx(); resumeCtx(); }catch(e){} }
   document.getElementById("btnStartSound").addEventListener("click",function(){ primeAudio(); startGame(true); });
   document.getElementById("btnStartMute").addEventListener("click",function(){ startGame(false); });
 
-  // タイトル画面中は背景だけ
-  window.addEventListener("load", function(){ fit(); G.grid=blank(); render(); });
+  // タイトル中は背景だけ
+  window.addEventListener("load",function(){fit(); G.grid=blank(); render();});
 
   // サウンドトグル
-  bind(btnAudio, function(){ setAudioOn(!AudioSys.on); toast(AudioSys.on?'音：ON':'音：OFF'); });
-  bind(btnBGM,  function(){ if(!AudioSys.on) setAudioOn(true); setBGMOn(!AudioSys.bgmOn); toast(AudioSys.bgmOn?'BGM：ON':'BGM：OFF'); });
+  bind(btnAudio,function(){setAudioOn(!AudioSys.on);toast(AudioSys.on?'音：ON':'音：OFF');});
+  bind(btnBGM,function(){if(!AudioSys.on)setAudioOn(true); setBGMOn(!AudioSys.bgmOn); toast(AudioSys.bgmOn?'BGM：ON':'BGM：OFF');});
   updateAudioButtons();
 })();
 </script>
